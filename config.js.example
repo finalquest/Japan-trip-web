@@ -1,0 +1,4 @@
+// config.js.example - Renombrar a config.js y agregar tu API key
+const CONFIG = {
+    GOOGLE_MAPS_API_KEY: 'TU_API_KEY_AQUI'
+};

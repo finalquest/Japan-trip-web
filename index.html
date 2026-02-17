@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Japan Trip Planner</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+    <script>
+        // Cargar Google Maps API dinámicamente con la key del config
+        if (typeof CONFIG !== 'undefined' && CONFIG.GOOGLE_MAPS_API_KEY) {
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${CONFIG.GOOGLE_MAPS_API_KEY}&libraries=places`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+        } else {
+            console.error('Error: config.js no encontrado o GOOGLE_MAPS_API_KEY no definida');
+            console.error('Copiá config.js.example a config.js y agregá tu API key');
+        }
+    </script>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>🇯🇵 Japan Trip Planner</h1>
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="showTab('map')">🗺️ Itinerario (KML)</button>
+            <button class="tab-btn" onclick="showTab('findings')">📸 Encontré Esto</button>
+        </div>
+    </nav>
+
+    <main>
+        <!-- Sección Mapa KML -->
+        <section id="map-section" class="tab-content active">
+            <div class="upload-area">
+                <h2>Cargar itinerario (KML)</h2>
+                <input type="file" id="kml-input" accept=".kml,.kmz" />
+                <p class="hint">Exportá tu mapa de Google My Maps como KML y subilo acá</p>
+            </div>
+            <div id="map-container"></div>
+            <div id="route-info"></div>
+        </section>
+
+        <!-- Sección Encontré Esto -->
+        <section id="findings-section" class="tab-content">
+            <div class="add-finding">
+                <h2>📸 Encontré algo interesante</h2>
+                <form id="finding-form">
+                    <div class="form-group">
+                        <label>Foto:</label>
+                        <input type="file" id="finding-photo" accept="image/*" capture="environment" required>
+                        <img id="photo-preview" style="display:none; max-width: 200px; margin-top: 10px;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>¿Qué es?</label>
+                        <input type="text" id="finding-title" placeholder="Ej: Figura de Gundam vintage" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Descripción / Notas:</label>
+                        <textarea id="finding-desc" placeholder="Precio, tienda, por qué no lo compraste, etc."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tienda / Ubicación:</label>
+                        <input type="text" id="finding-location" placeholder="Ej: Surugaya Akihabara">
+                        <button type="button" onclick="getCurrentLocation()">📍 Usar mi ubicación actual</button>
+                        <input type="hidden" id="finding-lat">
+                        <input type="hidden" id="finding-lng">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tags:</label>
+                        <div class="tags-input">
+                            <span class="tag" onclick="toggleTag(this)">#figure</span>
+                            <span class="tag" onclick="toggleTag(this)">#retro</span>
+                            <span class="tag" onclick="toggleTag(this)">#snacks</span>
+                            <span class="tag" onclick="toggleTag(this)">#electronics</span>
+                            <span class="tag" onclick="toggleTag(this)">#book</span>
+                            <span class="tag" onclick="toggleTag(this)">#clothes</span>
+                            <span class="tag" onclick="toggleTag(this)">#expensive</span>
+                            <input type="hidden" id="finding-tags">
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">💾 Guardar</button>
+                </form>
+            </div>
+            
+            <div class="findings-list">
+                <h2>Mis descubrimientos (<span id="findings-count">0</span>)</h2>
+                <div id="findings-grid"></div>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
