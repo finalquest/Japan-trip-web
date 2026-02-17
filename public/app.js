@@ -615,33 +615,20 @@ async function processBarcode(barcode) {
 }
 
 async function lookupBarcode(barcode) {
-    // Usar corsproxy.io para evitar CORS
+    // Usar el endpoint local del backend
     try {
-        const targetUrl = `https://go-upc.com/search?q=${encodeURIComponent(barcode)}`;
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-        
-        const response = await fetch(proxyUrl);
+        const response = await fetch(`${API_BASE}/api/lookup-barcode?code=${encodeURIComponent(barcode)}`);
         
         if (!response.ok) return null;
         
-        const html = await response.text();
+        const data = await response.json();
         
-        // Parsear HTML
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        
-        // Extraer nombre del producto
-        const name = doc.querySelector('h1')?.textContent?.trim() || 
-                    doc.querySelector('.product-name')?.textContent?.trim() ||
-                    doc.querySelector('[itemprop="name"]')?.textContent?.trim();
-        
-        const image = doc.querySelector('.product-image img')?.src ||
-                     doc.querySelector('img')?.src;
-        
-        const description = doc.querySelector('.description')?.textContent?.trim();
-        
-        if (name) {
-            return { name, image, description };
+        if (data.found && data.name) {
+            return { 
+                name: data.name, 
+                image: data.image, 
+                description: data.description 
+            };
         }
     } catch (err) {
         console.error('Barcode lookup error:', err);
@@ -696,7 +683,7 @@ function retakePhoto() {
 }
 
 // Guardar hallazgo
-document.getElementById('finding-form')?.addEventListener('submit', (e) => {
+document.getElementById('finding-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const photoInput = document.getElementById('finding-photo');
@@ -705,49 +692,83 @@ document.getElementById('finding-form')?.addEventListener('submit', (e) => {
     const location = document.getElementById('finding-location').value;
     const lat = document.getElementById('finding-lat').value;
     const lng = document.getElementById('finding-lng').value;
-    const tags = document.getElementById('finding-tags').value.split(',').filter(t => t);
+    const tags = document.getElementById('finding-tags').value;
     
+    const formData = new FormData();
     if (photoInput.files && photoInput.files[0]) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const finding = {
-                id: Date.now(),
-                photo: e.target.result,
-                title,
-                description: desc,
-                location,
-                lat,
-                lng,
-                tags,
-                date: new Date().toLocaleString('es-AR')
-            };
-            
-            currentFindings.unshift(finding);
-            saveFindings();
-            renderFindings();
-            
-            // Reset form
-            document.getElementById('finding-form').reset();
-            document.getElementById('photo-preview').style.display = 'none';
-            document.querySelectorAll('.tag.selected').forEach(t => t.classList.remove('selected'));
-            updateTagsInput();
-            
-            alert('Guardado!');
-        };
-        reader.readAsDataURL(photoInput.files[0]);
+        formData.append('photo', photoInput.files[0]);
+    }
+    formData.append('title', title);
+    formData.append('description', desc);
+    formData.append('location', location);
+    formData.append('lat', lat);
+    formData.append('lng', lng);
+    formData.append('tags', tags);
+    
+    try {
+        await saveFinding(formData);
+        
+        // Reset form
+        document.getElementById('finding-form').reset();
+        document.getElementById('photo-preview').src = '';
+        document.querySelectorAll('.tag.selected').forEach(t => t.classList.remove('selected'));
+        updateTagsInput();
+        
+        // Volver a pantalla inicial
+        document.getElementById('finding-form').style.display = 'none';
+        document.getElementById('camera-step').style.display = 'block';
+        
+        showNotification('✅ Guardado!');
+    } catch (err) {
+        showNotification('❌ Error al guardar');
     }
 });
 
-// LocalStorage
-function saveFindings() {
-    localStorage.setItem('japanFindings', JSON.stringify(currentFindings));
+// API Functions
+const API_BASE = '';
+
+async function loadFindings() {
+    try {
+        const response = await fetch(`${API_BASE}/api/findings`);
+        if (!response.ok) throw new Error('Failed to load findings');
+        currentFindings = await response.json();
+        renderFindings();
+    } catch (err) {
+        console.error('Error loading findings:', err);
+        showNotification('⚠️ Error cargando hallazgos');
+    }
 }
 
-function loadFindings() {
-    const saved = localStorage.getItem('japanFindings');
-    if (saved) {
-        currentFindings = JSON.parse(saved);
+async function saveFinding(formData) {
+    try {
+        const response = await fetch(`${API_BASE}/api/findings`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!response.ok) throw new Error('Failed to save');
+        const finding = await response.json();
+        currentFindings.unshift(finding);
         renderFindings();
+        return finding;
+    } catch (err) {
+        console.error('Error saving finding:', err);
+        throw err;
+    }
+}
+
+async function deleteFinding(id) {
+    if (!confirm('¿Borrar este item?')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/findings/${id}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Failed to delete');
+        currentFindings = currentFindings.filter(f => f.id !== id);
+        renderFindings();
+    } catch (err) {
+        console.error('Error deleting finding:', err);
+        showNotification('❌ Error al borrar');
     }
 }
 
@@ -762,27 +783,24 @@ function renderFindings() {
         return;
     }
     
-    grid.innerHTML = currentFindings.map(f => `
+    grid.innerHTML = currentFindings.map(f => {
+        const date = new Date(f.createdAt).toLocaleString('es-AR');
+        const photoUrl = f.photoUrl || f.photo || '';
+        const tags = f.tags || [];
+        
+        return `
         <div class="finding-card">
-            <button class="delete-btn" onclick="deleteFinding(${f.id})">×</button>
-            <img src="${f.photo}" alt="${f.title}">
+            <button class="delete-btn" onclick="deleteFinding('${f.id}')">×</button>
+            ${photoUrl ? `<img src="${photoUrl}" alt="${f.title}">` : ''}
             <div class="finding-card-content">
                 <h3>${f.title}</h3>
                 <p>${f.description || 'Sin descripción'}</p>
                 ${f.location ? `<div class="location">📍 ${f.location}</div>` : ''}
-                ${f.tags.length ? `<div class="tags">${f.tags.map(t => `<span class="tag-item">${t}</span>`).join('')}</div>` : ''}
-                <div class="date">${f.date}</div>
+                ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag-item">${t}</span>`).join('')}</div>` : ''}
+                <div class="date">${date}</div>
             </div>
         </div>
-    `).join('');
-}
-
-function deleteFinding(id) {
-    if (confirm('¿Borrar este item?')) {
-        currentFindings = currentFindings.filter(f => f.id !== id);
-        saveFindings();
-        renderFindings();
-    }
+    `}).join('');
 }
 
 // Hacer funciones disponibles globalmente para onclick
