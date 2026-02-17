@@ -4,12 +4,128 @@ let mapType = 'google'; // 'google' o 'leaflet'
 let currentFindings = [];
 let mapMarkers = [];
 
+// Config del repo
+const REPO_OWNER = 'finalquest';
+const REPO_NAME = 'tokyo2026';
+const REPO_BRANCH = 'main';
+const KML_FOLDER = 'maps';
+
 // Inicializar
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
     loadFindings();
+    loadKMLList();
     setupEventListeners();
 });
+
+// Cargar lista de KMLs desde el repo
+async function loadKMLList() {
+    const select = document.getElementById('repo-kml-select');
+    
+    // Lista de KMLs conocidos (hardcodeada para evitar CORS/API)
+    const kmlFiles = [
+        '1-asakusa.kml',
+        '2-nippori.kml',
+        '3-yanesen.kml',
+        '4-shibuya.kml',
+        '5-harajuku-omotesando.kml',
+        '6-shinjuku.kml',
+        '7-ginza-tsukiji-tokyo-station.kml',
+        '8-ueno-ameyoko.kml',
+        '9-ryogoku-tokyo-skytree.kml',
+        '10-itabashi-oyama.kml',
+        '11-kichijoji-inokashira.kml',
+        '12-shimokitazawa-sangenjaya.kml',
+        '13-daikanyama-nakameguro-meguro-river.kml',
+        '14-koenji-nakano.kml',
+        '15-akihabara-kanda.kml',
+        '16-ikebukuro-sugamo.kml',
+        '17-kamakura-enoshima.kml',
+        '18-nikko-utsunomiya.kml',
+        '19-hakone.kml',
+        '20-yokosuka.kml',
+        '21-kawagoe.kml',
+        '22-narita-naritasan-omotesando.kml',
+        '23-sawara.kml',
+        '24-fujinomiya.kml',
+        '25-kanda-jimbocho-tokyo-station.kml',
+        '26-todoroki-jiyugaoka-gotokuji-shoin.kml',
+        '27-chofu-jindaiji-jindai-botanical.kml',
+        '28-setagaya-tamagawa.kml',
+        '29-nerima-kasugacho-hikarigaoka.kml',
+        '30-edogawa-kasai-rinkai-park.kml',
+        '31-adachi-nishiarai-daishi.kml',
+        '32-katsushika-shibamata-yagiri.kml',
+        '33-sumida-kinshicho-ryogoku.kml',
+        '34-taito-asakusa-okachimachi.kml',
+        '35-chiyoda-imperial-palace-marunouchi.kml',
+        '36-minato-roppongi-azabu.juban.kml',
+        '37-shinagawa-tennozu-oisle.kml',
+        '38-meguro-gakugeidaigaku-nakameguro.kml',
+        '39-setagaya-shimokitazawa-daita.kml',
+        '40-shibuya-ebisu-daikanyama.kml',
+        '41-shinjuku-takadanobaba-waseda.kml',
+        '42-toshima-ikebukuro-meijiro.kml',
+        '43-kita-akabane-ukima.kml',
+        '44-itabashi-nerima-takao.kml',
+        '45-toda-soka-koshigaya.kml',
+        '46-kasukabe-sugito-matsudo.kml',
+        '47-ichikawa-funabashi-urayasu.kml',
+        '48-misato-yoshikawa-nagareyama.kml',
+        '49-kashiwa-abiko-toride.kml',
+        '50-tsukuba-kasumigaura.kml',
+        '51-mito-hitachi.kml'
+    ];
+    
+    kmlFiles.forEach(file => {
+        const option = document.createElement('option');
+        option.value = file;
+        option.textContent = file.replace('.kml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        select.appendChild(option);
+    });
+}
+
+// Cargar KML seleccionado del repo
+async function loadRepoKML() {
+    const select = document.getElementById('repo-kml-select');
+    const filename = select.value;
+    
+    if (!filename) {
+        alert('Seleccioná un KML primero');
+        return;
+    }
+    
+    const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/${KML_FOLDER}/${filename}`;
+    
+    try {
+        console.log('Cargando KML desde:', url);
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const kmlData = await response.text();
+        
+        // Procesar el KML
+        if (mapType === 'google') {
+            loadKMLGoogle(kmlData);
+        } else {
+            loadKMLLeaflet(kmlData);
+        }
+        
+        // Parsear para mostrar lista
+        const parser = new DOMParser();
+        const kml = parser.parseFromString(kmlData, 'text/xml');
+        displayKMLPoints(kml);
+        
+        alert(`Cargado: ${filename}`);
+        
+    } catch (error) {
+        console.error('Error cargando KML:', error);
+        alert('Error cargando el KML. Probá de nuevo.');
+    }
+}
 
 // Tabs
 function showTab(tabName) {

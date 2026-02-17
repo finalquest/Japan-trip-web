@@ -56,8 +56,23 @@
         <section id="map-section" class="tab-content active">
             <div class="upload-area">
                 <h2>Cargar itinerario (KML)</h2>
-                <input type="file" id="kml-input" accept=".kml,.kmz" />
-                <p class="hint">Exportá tu mapa de Google My Maps como KML y subilo acá</p>
+                
+                <div class="kml-selector">
+                    <label>📂 Seleccionar del repositorio:</label>
+                    <select id="repo-kml-select">
+                        <option value="">-- Elegir un KML guardado --</option>
+                    </select>
+                    <button type="button" onclick="loadRepoKML()" class="btn-secondary">Cargar</button>
+                </div>
+                
+                <div class="divider">o</div>
+                
+                <div class="manual-upload">
+                    <label>📁 Subir archivo manual:</label>
+                    <input type="file" id="kml-input" accept=".kml,.kmz" />
+                </div>
+                
+                <p class="hint">Los KMLs se sincronizan desde: github.com/finalquest/tokyo2026</p>
             </div>
             <div id="map-container"></div>
             <div id="route-info"></div>
