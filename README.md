@@ -18,6 +18,11 @@ Web app simple para planificar y documentar tu viaje a Japón.
 
 ## Cómo usar
 
+### Setup inicial
+1. Copiá `config.js.example` a `config.js`
+2. Editá `config.js` y agregá tu Google Maps API key
+3. Abrí `index.html` en tu navegador
+
 ### Local (sin instalar nada)
 1. Abrí el archivo `index.html` en tu navegador
 2. ¡Listo! No necesitás servidor ni nada
