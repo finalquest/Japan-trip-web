@@ -237,17 +237,26 @@ function loadKMLLeaflet(kmlData) {
     mapMarkers = [];
     
     placemarks.forEach((placemark, i) => {
-        const name = placemark.querySelector('name')?.textContent || `Punto ${i+1}`;
-        const desc = placemark.querySelector('description')?.textContent || '';
-        const coords = placemark.querySelector('coordinates')?.textContent?.trim();
+        // Solo procesar puntos (no LineString/rutas)
+        const point = placemark.querySelector('Point');
+        if (!point) return;
+        
+        const name = getPlacemarkName(placemark, i);
+        const extendedData = placemark.querySelector('ExtendedData');
+        const address = extendedData?.querySelector('Data[name="address"] value')?.textContent || '';
+        const coords = point.querySelector('coordinates')?.textContent?.trim();
         
         if (coords) {
             const [lng, lat] = coords.split(',').map(Number);
             if (!isNaN(lat) && !isNaN(lng)) {
                 bounds.extend([lat, lng]);
                 
+                const popupContent = address 
+                    ? `<strong>${name}</strong><br><small>${address}</small>`
+                    : `<strong>${name}</strong>`;
+                
                 const marker = L.marker([lat, lng])
-                    .bindPopup(`<strong>${name}</strong><br>${desc}`)
+                    .bindPopup(popupContent)
                     .addTo(map);
                 
                 mapMarkers.push(marker);
@@ -260,16 +269,42 @@ function loadKMLLeaflet(kmlData) {
     }
 }
 
+function getPlacemarkName(placemark, index) {
+    // Intentar obtener nombre de diferentes lugares en el KML
+    // 1. ExtendedData > Data[name="name"] > value
+    const extendedData = placemark.querySelector('ExtendedData');
+    if (extendedData) {
+        const dataName = extendedData.querySelector('Data[name="name"] value');
+        if (dataName?.textContent) {
+            return dataName.textContent;
+        }
+    }
+    // 2. Tag <name> directo
+    const nameTag = placemark.querySelector('name');
+    if (nameTag?.textContent) {
+        return nameTag.textContent;
+    }
+    // 3. Fallback
+    return `Punto ${index + 1}`;
+}
+
 function displayKMLPoints(kmlDoc) {
     const placemarks = kmlDoc.querySelectorAll('Placemark');
     const infoDiv = document.getElementById('route-info');
-    let html = `<h3>Puntos en el itinerario (${placemarks.length})</h3><ul>`;
     
-    placemarks.forEach((placemark, i) => {
-        const name = placemark.querySelector('name')?.textContent || `Punto ${i+1}`;
-        const desc = placemark.querySelector('description')?.textContent || '';
+    // Solo mostrar puntos (no rutas/linestrings)
+    const pointPlacemarks = Array.from(placemarks).filter(p => 
+        p.querySelector('Point') || p.querySelector('coordinates')
+    );
+    
+    let html = `<h3>Puntos en el itinerario (${pointPlacemarks.length})</h3><ul>`;
+    
+    pointPlacemarks.forEach((placemark, i) => {
+        const name = getPlacemarkName(placemark, i);
+        const extendedData = placemark.querySelector('ExtendedData');
+        const address = extendedData?.querySelector('Data[name="address"] value')?.textContent || '';
         
-        html += `<li><strong>${name}</strong>${desc ? ': ' + desc.substring(0, 50) + '...' : ''}</li>`;
+        html += `<li><strong>${name}</strong>${address ? '<br><small>' + address + '</small>' : ''}</li>`;
     });
     
     html += '</ul>';
