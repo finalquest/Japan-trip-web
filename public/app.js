@@ -561,6 +561,10 @@ async function scanBarcode() {
                 console.error('Barcode detection error:', err);
             }
         }
+    } else {
+        // No hay BarcodeDetector, mostrar input manual
+        showManualBarcodeInput();
+        return;
     }
 
     // Si no hay BarcodeDetector o no detectó, seguir intentando
@@ -637,6 +641,40 @@ async function lookupBarcode(barcode) {
     return null;
 }
 
+function showManualBarcodeInput() {
+    // Detener escaneo
+    barcodeScanning = false;
+    if (barcodeStream) {
+        barcodeStream.getTracks().forEach(track => track.stop());
+        barcodeStream = null;
+    }
+    
+    // Mostrar input manual
+    const container = document.getElementById('barcode-video-container');
+    container.innerHTML = `
+        <div style="padding: 2rem; text-align: center;">
+            <p style="margin-bottom: 1rem; color: #666;">Tu dispositivo no soporta escaneo automático.</p>
+            <p style="margin-bottom: 1rem;">Ingresá el código manualmente:</p>
+            <input type="text" id="manual-barcode" placeholder="Ej: 7791337010093" style="padding: 0.75rem; font-size: 1.2rem; width: 80%; text-align: center; margin-bottom: 1rem;">
+            <br>
+            <button onclick="submitManualBarcode()" class="btn-camera" style="margin-right: 0.5rem;">🔍 Buscar</button>
+            <button onclick="cancelBarcodeScan()" class="btn-cancel">❌ Cancelar</button>
+        </div>
+    `;
+}
+
+function submitManualBarcode() {
+    const input = document.getElementById('manual-barcode');
+    const barcode = input.value.trim();
+    
+    if (!barcode) {
+        alert('Ingresá un código de barras');
+        return;
+    }
+    
+    processBarcode(barcode);
+}
+
 function cancelBarcodeScan() {
     barcodeScanning = false;
     
@@ -644,6 +682,13 @@ function cancelBarcodeScan() {
         barcodeStream.getTracks().forEach(track => track.stop());
         barcodeStream = null;
     }
+    
+    // Restaurar el video container
+    const container = document.getElementById('barcode-video-container');
+    container.innerHTML = `
+        <video id="barcode-video" playsinline></video>
+        <div class="scan-line"></div>
+    `;
     
     document.getElementById('barcode-step').style.display = 'none';
     document.getElementById('camera-step').style.display = 'block';
@@ -813,6 +858,7 @@ window.deleteFinding = deleteFinding;
 window.retakePhoto = retakePhoto;
 window.startBarcodeScan = startBarcodeScan;
 window.cancelBarcodeScan = cancelBarcodeScan;
+window.submitManualBarcode = submitManualBarcode;
 
 function setupEventListeners() {
     // Cualquier setup adicional
