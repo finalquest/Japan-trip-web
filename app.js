@@ -491,7 +491,7 @@ function getCurrentLocation() {
     }
 }
 
-// Preview de foto
+// Preview de foto y mostrar formulario
 document.getElementById('finding-photo')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -499,11 +499,30 @@ document.getElementById('finding-photo')?.addEventListener('change', (e) => {
         reader.onload = (e) => {
             const img = document.getElementById('photo-preview');
             img.src = e.target.result;
-            img.style.display = 'block';
+            
+            // Ocultar cámara, mostrar formulario
+            document.getElementById('camera-step').style.display = 'none';
+            document.getElementById('finding-form').style.display = 'block';
         };
         reader.readAsDataURL(file);
     }
 });
+
+// Volver a sacar foto
+function retakePhoto() {
+    // Limpiar input y preview
+    document.getElementById('finding-photo').value = '';
+    document.getElementById('photo-preview').src = '';
+    
+    // Ocultar formulario, mostrar cámara
+    document.getElementById('finding-form').style.display = 'none';
+    document.getElementById('camera-step').style.display = 'block';
+    
+    // Limpiar campos del form
+    document.getElementById('finding-form').reset();
+    document.querySelectorAll('.tag.selected').forEach(t => t.classList.remove('selected'));
+    updateTagsInput();
+}
 
 // Guardar hallazgo
 document.getElementById('finding-form')?.addEventListener('submit', (e) => {
@@ -602,6 +621,7 @@ window.backToSelector = backToSelector;
 window.toggleTag = toggleTag;
 window.getCurrentLocation = getCurrentLocation;
 window.deleteFinding = deleteFinding;
+window.retakePhoto = retakePhoto;
 
 function setupEventListeners() {
     // Cualquier setup adicional

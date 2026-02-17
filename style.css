@@ -119,6 +119,72 @@ main {
     background: #555;
 }
 
+/* Botón de cámara (pantalla inicial) */
+.camera-only {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.btn-camera-large {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: #1a73e8;
+    color: white;
+    border: none;
+    font-size: 2.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    box-shadow: 0 4px 15px rgba(26, 115, 232, 0.4);
+    transition: all 0.2s;
+}
+
+.btn-camera-large:hover {
+    background: #1557b0;
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(26, 115, 232, 0.5);
+}
+
+.btn-camera-large:active {
+    transform: scale(0.95);
+}
+
+.camera-hint {
+    color: #666;
+    margin-top: 1.5rem;
+    font-size: 1rem;
+}
+
+/* Preview de foto con botón de retake */
+.photo-preview-container {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.photo-preview-container img {
+    max-height: 300px;
+    width: auto;
+    display: block;
+    margin: 0 auto 1rem;
+}
+
+.btn-retake {
+    padding: 0.5rem 1rem;
+    background: #666;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.btn-retake:hover {
+    background: #555;
+}
+
 .divider {
     text-align: center;
     margin: 1.5rem 0;

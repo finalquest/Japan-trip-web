@@ -89,11 +89,21 @@
         <section id="findings-section" class="tab-content">
             <div class="add-finding">
                 <h2>📸 Encontré algo interesante</h2>
-                <form id="finding-form">
-                    <div class="form-group">
-                        <label>Foto:</label>
-                        <input type="file" id="finding-photo" accept="image/*" capture="environment" required>
-                        <img id="photo-preview" style="display:none; max-width: 200px; margin-top: 10px;">
+                
+                <!-- Paso 1: Solo el botón de cámara -->
+                <div id="camera-step" class="camera-only">
+                    <input type="file" id="finding-photo" accept="image/*" capture="environment" required style="display: none;">
+                    <button type="button" id="camera-btn" class="btn-camera-large" onclick="document.getElementById('finding-photo').click()">
+                        📸 Sacar Foto
+                    </button>
+                    <p class="camera-hint">Sacá una foto del producto que encontraste</p>
+                </div>
+                
+                <!-- Paso 2: Formulario completo (aparece después de sacar foto) -->
+                <form id="finding-form" style="display: none;">
+                    <div class="photo-preview-container">
+                        <img id="photo-preview" style="max-width: 100%; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <button type="button" class="btn-retake" onclick="retakePhoto()">🔄 Volver a sacar</button>
                     </div>
                     
                     <div class="form-group">
