@@ -18,69 +18,51 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
-// Cargar lista de KMLs desde el repo
+// Cargar lista de KMLs desde el repo usando GitHub API
 async function loadKMLList() {
     const select = document.getElementById('repo-kml-select');
     
-    // Lista de KMLs reales del repo tokyo2026
-    const kmlFiles = [
-        '1-asakusa.kml',
-        '2-nippori.kml',
-        '3-monzen-nakacho.kml',
-        '4-kagurazaka.kml',
-        '5-sugamo-komagome-rikugien.kml',
-        '6-oji-asukayama-tabata.kml',
-        '7-tokyo-station-nihonbashi-marunouchi.kml',
-        '8-chiyoda-jimbocho-chidorigafuchi.kml',
-        '9-ueno-okachimachi-ameyoko.kml',
-        '10-itabashi-oyama.kml',
-        '11-kichijoji-inokashira.kml',
-        '12-shimokitazawa-sangenjaya.kml',
-        '13-daikanyama-nakameguro-meguro-river.kml',
-        '14-koenji-nakano.kml',
-        '15-akihabara-kanda.kml',
-        '16-ikebukuro-sugamo.kml',
-        '17-kamakura-enoshima.kml',
-        '18-nikko-utsunomiya.kml',
-        '19-hakone.kml',
-        '20-yokosuka.kml',
-        '21-kawagoe.kml',
-        '22-narita-naritasan-omotesando.kml',
-        '23-sawara.kml',
-        '24-fujinomiya.kml',
-        '25-kanda-jimbocho-tokyo-station.kml',
-        '26-todoroki-jiyugaoka-gotokuji-shoin.kml',
-        '27-chofu-jindaiji-jindai-botanical.kml',
-        '28-mitaka-inokashira-norte.kml',
-        '30-takanawa-sengakuji-gotanda.kml',
-        '31-yanaka-profundo-ueno-toshogu-ikenohata.kml',
-        '32-tokyo-tower-zojoji-shimbashi-atago-shiodome.kml',
-        '33-shibamata-taishakuten-tora-san-rio-edo.kml',
-        '34-ginza-nihonbashi.kml',
-        '35-yasukuni-kokyo-gaien-museos-imperiales.kml',
-        '36-akabane-higashi-jujo.kml',
-        '37-chichibu.kml',
-        '38-saitama-rail-museum.kml',
-        '39-kawaguchiko-fuji.kml',
-        '40-yokohama-chinatown-minato-mirai.kml',
-        '41-kuramae-asakusabashi-ryogoku.kml',
-        '42-toyosu-tsukiji-mercados.kml',
-        '43-odaiba-bahia.kml',
-        '44-atami.kml',
-        '46-zoshigaya-waseda-kagurazaka.kml',
-        '50-old-tokaido-hakone.kml',
-        '51-koshu-kaido-hachioji.kml',
-        '52-okutama.kml',
-        '53-takao-san.kml',
-        '54-oyama.kml'
-    ];
-    
-    kmlFiles.forEach(file => {
-        const option = document.createElement('option');
-        option.value = file;
-        option.textContent = file.replace('.kml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        select.appendChild(option);
-    });
+    try {
+        // Usar GitHub API para listar archivos de la carpeta maps
+        const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${KML_FOLDER}`;
+        console.log('Fetching KML list from:', apiUrl);
+        
+        const response = await fetch(apiUrl);
+        
+        if (!response.ok) {
+            throw new Error(`GitHub API error: ${response.status}`);
+        }
+        
+        const files = await response.json();
+        
+        // Filtrar solo archivos .kml
+        const kmlFiles = files
+            .filter(file => file.type === 'file' && file.name.endsWith('.kml'))
+            .map(file => file.name)
+            .sort();
+        
+        console.log(`Found ${kmlFiles.length} KML files`);
+        
+        // Limpiar opciones existentes (excepto la primera)
+        while (select.options.length > 1) {
+            select.remove(1);
+        }
+        
+        // Agregar archivos al dropdown
+        kmlFiles.forEach(file => {
+            const option = document.createElement('option');
+            option.value = file;
+            option.textContent = file.replace('.kml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            select.appendChild(option);
+        });
+        
+        showNotification(`📂 ${kmlFiles.length} itinerarios cargados`);
+        
+    } catch (error) {
+        console.error('Error loading KML list:', error);
+        // Fallback: mostrar mensaje y dejar el select vacío
+        showNotification('⚠️ No se pudo cargar la lista automáticamente');
+    }
 }
 
 // Variable global para el infowindow actual (Google Maps)
