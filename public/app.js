@@ -512,18 +512,27 @@ async function startBarcodeScan() {
         video.play();
         
         barcodeScanning = true;
+        
+        // Timeout de seguridad - si ZXing no carga, mostrar input manual
+        setTimeout(() => {
+            if (barcodeScanning && (!window.ZXingBrowser || !window.ZXingBrowser.BrowserMultiFormatReader)) {
+                console.log('ZXing not loaded, showing manual input');
+                showManualBarcodeInput();
+            }
+        }, 2000);
+        
         // Esperar a que el video esté listo antes de escanear
         video.addEventListener('loadeddata', () => {
             console.log('Video ready, starting barcode scan');
             scanBarcode();
         }, { once: true });
         
-        // Timeout de seguridad por si el evento no dispara
+        // Iniciar escaneo inmediatamente también
         setTimeout(() => {
             if (barcodeScanning) {
                 scanBarcode();
             }
-        }, 1000);
+        }, 500);
     } catch (err) {
         console.error('Error accessing camera:', err);
         alert('No se pudo acceder a la cámara. Asegurate de dar permisos.');
@@ -534,40 +543,27 @@ async function startBarcodeScan() {
 async function scanBarcode() {
     if (!barcodeScanning) return;
 
-    const video = document.getElementById('barcode-video');
-
-    // Verificar que el video esté listo
-    if (video.readyState < 2) {
-        if (barcodeScanning) {
-            requestAnimationFrame(scanBarcode);
-        }
-        return;
-    }
-
-    // Usar BarcodeDetector API si está disponible
-    if ('BarcodeDetector' in window) {
+    // Usar ZXing si está disponible
+    if (window.ZXingBrowser && window.ZXingBrowser.BrowserMultiFormatReader) {
         try {
-            const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93'] });
-            const barcodes = await barcodeDetector.detect(video);
-            if (barcodes.length > 0) {
-                const barcode = barcodes[0].rawValue;
-                console.log('Barcode detected:', barcode);
-                await processBarcode(barcode);
+            const reader = new window.ZXingBrowser.BrowserMultiFormatReader();
+            const video = document.getElementById('barcode-video');
+            
+            const result = await reader.decodeFromVideoElement(video);
+            if (result) {
+                console.log('Barcode detected:', result.text);
+                await processBarcode(result.text);
                 return;
             }
         } catch (err) {
-            // Solo loguear errores que no sean de estado inválido
-            if (err.name !== 'InvalidStateError') {
-                console.error('Barcode detection error:', err);
+            // NoFoundException es normal cuando no hay código
+            if (err.name !== 'NotFoundException') {
+                console.error('ZXing error:', err);
             }
         }
-    } else {
-        // No hay BarcodeDetector, mostrar input manual
-        showManualBarcodeInput();
-        return;
     }
 
-    // Si no hay BarcodeDetector o no detectó, seguir intentando
+    // Seguir intentando
     if (barcodeScanning) {
         requestAnimationFrame(scanBarcode);
     }
@@ -653,7 +649,7 @@ function showManualBarcodeInput() {
     const container = document.getElementById('barcode-video-container');
     container.innerHTML = `
         <div style="padding: 2rem; text-align: center;">
-            <p style="margin-bottom: 1rem; color: #666;">Tu dispositivo no soporta escaneo automático.</p>
+            <p style="margin-bottom: 1rem; color: #666;">No se pudo iniciar el escáner automático.</p>
             <p style="margin-bottom: 1rem;">Ingresá el código manualmente:</p>
             <input type="text" id="manual-barcode" placeholder="Ej: 7791337010093" style="padding: 0.75rem; font-size: 1.2rem; width: 80%; text-align: center; margin-bottom: 1rem;">
             <br>
