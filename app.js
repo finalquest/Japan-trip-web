@@ -7,7 +7,7 @@ let mapMarkers = [];
 // Config del repo
 const REPO_OWNER = 'finalquest';
 const REPO_NAME = 'tokyo2026';
-const REPO_BRANCH = 'main';
+const REPO_BRANCH = 'master';
 const KML_FOLDER = 'maps';
 
 // Inicializar
