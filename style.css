@@ -151,6 +151,39 @@ main {
     font-weight: 500;
 }
 
+/* Modo visualización */
+.viewer-mode {
+    margin-bottom: 1rem;
+}
+
+.btn-back {
+    padding: 0.75rem 1.5rem;
+    background: #666;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-back:hover {
+    background: #555;
+}
+
+/* Mapa en modo visualización (más grande) */
+.map-expanded {
+    height: 70vh !important;
+    min-height: 500px;
+}
+
+/* Ocultar selector en modo visualización */
+.hidden {
+    display: none !important;
+}
+
 #map-container {
     width: 100%;
     height: 600px;
@@ -324,6 +357,27 @@ main {
     font-size: 0.75rem;
     color: #999;
     margin-top: 0.5rem;
+}
+
+/* Pins numerados para Leaflet */
+.numbered-pin {
+    background: transparent !important;
+    border: none !important;
+}
+
+.pin-number {
+    width: 30px;
+    height: 30px;
+    background: #1a73e8;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .delete-btn {

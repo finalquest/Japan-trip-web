@@ -83,6 +83,9 @@ async function loadKMLList() {
     });
 }
 
+// Variable global para el infowindow actual (Google Maps)
+let currentInfoWindow = null;
+
 // Cargar KML seleccionado del repo
 async function loadRepoKML() {
     const select = document.getElementById('repo-kml-select');
@@ -96,6 +99,12 @@ async function loadRepoKML() {
     const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${REPO_BRANCH}/${KML_FOLDER}/${filename}`;
     
     try {
+        // Cerrar infowindow anterior si existe
+        if (currentInfoWindow) {
+            currentInfoWindow.close();
+            currentInfoWindow = null;
+        }
+        
         console.log('Cargando KML desde:', url);
         const response = await fetch(url);
         
@@ -105,7 +114,6 @@ async function loadRepoKML() {
         
         const kmlData = await response.text();
         console.log('KML descargado, tamaño:', kmlData.length);
-        console.log('Primeros 200 chars:', kmlData.substring(0, 200));
         
         if (!kmlData.includes('<kml') && !kmlData.includes('<Placemark')) {
             throw new Error('El archivo descargado no parece ser un KML válido');
@@ -131,13 +139,41 @@ async function loadRepoKML() {
             loadKMLLeaflet(kmlData);
         }
         
-        alert(`✅ Cargado: ${filename}`);
+        // Mostrar mensaje sutil en lugar de alert
+        showNotification(`✅ Cargado: ${filename}`);
+        
+        // Cambiar a modo visualización
+        enterViewerMode();
         
     } catch (error) {
         console.error('Error cargando KML:', error);
-        console.error('Stack:', error.stack);
-        alert(`❌ Error: ${error.message}\n\nRevisá la consola (F12) para más detalles.`);
+        alert(`❌ Error: ${error.message}`);
     }
+}
+
+// Mostrar notificación sutil
+function showNotification(message) {
+    const notif = document.createElement('div');
+    notif.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: #34a853;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 10000;
+        font-weight: 500;
+    `;
+    notif.textContent = message;
+    document.body.appendChild(notif);
+    
+    setTimeout(() => {
+        notif.style.opacity = '0';
+        notif.style.transition = 'opacity 0.5s';
+        setTimeout(() => notif.remove(), 500);
+    }, 3000);
 }
 
 // Tabs
@@ -194,11 +230,64 @@ function initLeafletMap() {
     console.log('Usando OpenStreetMap (Leaflet)');
 }
 
-// Cargar KML
+// Cambiar a modo visualización
+function enterViewerMode() {
+    document.getElementById('kml-selector-mode').style.display = 'none';
+    document.getElementById('kml-viewer-mode').style.display = 'block';
+    document.getElementById('map-container').classList.add('map-expanded');
+    
+    // Ajustar mapa después de cambiar tamaño
+    setTimeout(() => {
+        if (mapType === 'google' && map) {
+            google.maps.event.trigger(map, 'resize');
+        } else if (mapType === 'leaflet' && map) {
+            map.invalidateSize();
+        }
+    }, 300);
+}
+
+// Volver a modo selección
+function backToSelector() {
+    document.getElementById('kml-selector-mode').style.display = 'block';
+    document.getElementById('kml-viewer-mode').style.display = 'none';
+    document.getElementById('map-container').classList.remove('map-expanded');
+    
+    // Limpiar mapa
+    mapMarkers.forEach(m => {
+        if (mapType === 'google') m.setMap(null);
+        else m.remove();
+    });
+    mapMarkers = [];
+    if (currentInfoWindow) {
+        currentInfoWindow.close();
+        currentInfoWindow = null;
+    }
+    document.getElementById('route-info').innerHTML = '';
+    
+    // Reset select
+    document.getElementById('repo-kml-select').value = '';
+    
+    // Ajustar mapa después de cambiar tamaño
+    setTimeout(() => {
+        if (mapType === 'google' && map) {
+            google.maps.event.trigger(map, 'resize');
+        } else if (mapType === 'leaflet' && map) {
+            map.invalidateSize();
+        }
+    }, 300);
+}
+
+// Cargar KML desde archivo
 function loadKML(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
         const kmlData = e.target.result;
+        
+        // Cerrar infowindow anterior si existe
+        if (currentInfoWindow) {
+            currentInfoWindow.close();
+            currentInfoWindow = null;
+        }
         
         if (mapType === 'google') {
             loadKMLGoogle(kmlData);
@@ -210,6 +299,12 @@ function loadKML(file) {
         const parser = new DOMParser();
         const kml = parser.parseFromString(kmlData, 'text/xml');
         displayKMLPoints(kml);
+        
+        // Mostrar notificación sutil
+        showNotification(`✅ Cargado: ${file.name}`);
+        
+        // Cambiar a modo visualización
+        enterViewerMode();
     };
     reader.readAsText(file);
 }
@@ -222,9 +317,13 @@ function loadKMLGoogle(kmlData) {
     const placemarks = kml.querySelectorAll('Placemark');
     const bounds = new google.maps.LatLngBounds();
     
-    // Limpiar marcadores anteriores
+    // Limpiar marcadores anteriores y cerrar infowindow
     mapMarkers.forEach(m => m.setMap(null));
     mapMarkers = [];
+    if (currentInfoWindow) {
+        currentInfoWindow.close();
+        currentInfoWindow = null;
+    }
     
     placemarks.forEach((placemark, i) => {
         // Solo procesar puntos (no LineString/rutas)
@@ -245,15 +344,28 @@ function loadKMLGoogle(kmlData) {
                 const marker = new google.maps.Marker({
                     position: position,
                     map: map,
-                    title: name
+                    title: name,
+                    label: {
+                        text: String(mapMarkers.length + 1),
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                    }
                 });
                 
                 const content = address 
-                    ? `<strong>${name}</strong><br><small>${address}</small>`
-                    : `<strong>${name}</strong>`;
+                    ? `<strong>${mapMarkers.length + 1}. ${name}</strong><br><small>${address}</small>`
+                    : `<strong>${mapMarkers.length + 1}. ${name}</strong>`;
                 
                 const infowindow = new google.maps.InfoWindow({ content });
-                marker.addListener('click', () => infowindow.open(map, marker));
+                marker.addListener('click', () => {
+                    // Cerrar infowindow anterior si existe
+                    if (currentInfoWindow) {
+                        currentInfoWindow.close();
+                    }
+                    infowindow.open(map, marker);
+                    currentInfoWindow = infowindow;
+                });
                 
                 mapMarkers.push(marker);
             }
@@ -293,10 +405,18 @@ function loadKMLLeaflet(kmlData) {
                 bounds.extend([lat, lng]);
                 
                 const popupContent = address 
-                    ? `<strong>${name}</strong><br><small>${address}</small>`
-                    : `<strong>${name}</strong>`;
+                    ? `<strong>${mapMarkers.length + 1}. ${name}</strong><br><small>${address}</small>`
+                    : `<strong>${mapMarkers.length + 1}. ${name}</strong>`;
                 
-                const marker = L.marker([lat, lng])
+                // Crear pin con número usando divIcon
+                const numberedIcon = L.divIcon({
+                    className: 'numbered-pin',
+                    html: `<div class="pin-number">${mapMarkers.length + 1}</div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30]
+                });
+                
+                const marker = L.marker([lat, lng], { icon: numberedIcon })
                     .bindPopup(popupContent)
                     .addTo(map);
                 
@@ -492,6 +612,14 @@ function deleteFinding(id) {
         renderFindings();
     }
 }
+
+// Hacer funciones disponibles globalmente para onclick
+window.showTab = showTab;
+window.loadRepoKML = loadRepoKML;
+window.backToSelector = backToSelector;
+window.toggleTag = toggleTag;
+window.getCurrentLocation = getCurrentLocation;
+window.deleteFinding = deleteFinding;
 
 function setupEventListeners() {
     // Cualquier setup adicional

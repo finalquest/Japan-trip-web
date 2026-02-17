@@ -54,7 +54,8 @@
     <main>
         <!-- Sección Mapa KML -->
         <section id="map-section" class="tab-content active">
-            <div class="upload-area">
+            <!-- Modo Selección -->
+            <div id="kml-selector-mode" class="upload-area">
                 <h2>Cargar itinerario (KML)</h2>
                 
                 <div class="kml-selector">
@@ -74,7 +75,13 @@
                 
                 <p class="hint">Los KMLs se sincronizan desde: github.com/finalquest/tokyo2026</p>
             </div>
-            <div id="map-container"></div>
+            
+            <!-- Modo Visualización (oculto inicialmente) -->
+            <div id="kml-viewer-mode" class="viewer-mode" style="display: none;">
+                <button onclick="backToSelector()" class="btn-back">← Volver a cargar KML</button>
+            </div>
+            
+            <div id="map-container" class="map-default"></div>
             <div id="route-info"></div>
         </section>
 
