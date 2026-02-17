@@ -9,7 +9,23 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <!-- ZXing for barcode scanning -->
-    <script src="https://unpkg.com/@zxing/browser@0.1.1/umd/index.min.js"></script>
+    <script src="/zxing-browser.min.js"></script>
+    <script src="/barcode-scanner.js"></script>
+    <script>
+        // Verificar que ZXing esté cargado correctamente
+        (function() {
+            // Dar tiempo a que el script se ejecute
+            setTimeout(function() {
+                console.log('=== ZXING DEBUG ===');
+                console.log('ZXingBrowser disponible:', typeof window.ZXingBrowser !== 'undefined');
+                console.log('BarcodeScanner disponible:', typeof window.BarcodeScanner !== 'undefined');
+                if (window.ZXingBrowser) {
+                    console.log('ZXingBrowser keys:', Object.keys(window.ZXingBrowser));
+                }
+                console.log('===================');
+            }, 100);
+        })();
+    </script>
     
     <script src="config.js"></script>
     <script>

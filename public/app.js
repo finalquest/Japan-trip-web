@@ -69,7 +69,6 @@ async function loadKMLList() {
 let currentInfoWindow = null;
 
 // Variable para el escáner de barcode
-let barcodeStream = null;
 let barcodeScanning = false;
 
 // Cargar KML seleccionado del repo
@@ -501,80 +500,46 @@ async function startBarcodeScan() {
     const cameraStep = document.getElementById('camera-step');
     const barcodeStep = document.getElementById('barcode-step');
     
+    // Verificar que BarcodeScanner esté disponible
+    if (!window.BarcodeScanner) {
+        console.error('BarcodeScanner no está cargado');
+        alert('Error: El escáner no está disponible. Recargá la página.');
+        return;
+    }
+    
     cameraStep.style.display = 'none';
     barcodeStep.style.display = 'block';
     
+    barcodeScanning = true;
+    
     try {
-        barcodeStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
-        });
-        video.srcObject = barcodeStream;
-        video.play();
-        
-        barcodeScanning = true;
-        
-        // Timeout de seguridad - si ZXing no carga, mostrar input manual
-        setTimeout(() => {
-            if (barcodeScanning && (!window.ZXingBrowser || !window.ZXingBrowser.BrowserMultiFormatReader)) {
-                console.log('ZXing not loaded, showing manual input');
-                showManualBarcodeInput();
+        console.log('Iniciando scanner...');
+        await window.BarcodeScanner.start(
+            video,
+            (barcode) => {
+                // onDetected
+                console.log('Código detectado:', barcode);
+                processBarcode(barcode);
+            },
+            (errorMsg) => {
+                // onError - solo errores graves
+                console.log('Scanner error:', errorMsg);
             }
-        }, 2000);
-        
-        // Esperar a que el video esté listo antes de escanear
-        video.addEventListener('loadeddata', () => {
-            console.log('Video ready, starting barcode scan');
-            scanBarcode();
-        }, { once: true });
-        
-        // Iniciar escaneo inmediatamente también
-        setTimeout(() => {
-            if (barcodeScanning) {
-                scanBarcode();
-            }
-        }, 500);
+        );
+        console.log('Scanner iniciado correctamente');
     } catch (err) {
-        console.error('Error accessing camera:', err);
-        alert('No se pudo acceder a la cámara. Asegurate de dar permisos.');
-        cancelBarcodeScan();
-    }
-}
-
-async function scanBarcode() {
-    if (!barcodeScanning) return;
-
-    // Usar ZXing si está disponible
-    if (window.ZXingBrowser && window.ZXingBrowser.BrowserMultiFormatReader) {
-        try {
-            const reader = new window.ZXingBrowser.BrowserMultiFormatReader();
-            const video = document.getElementById('barcode-video');
-            
-            const result = await reader.decodeFromVideoElement(video);
-            if (result) {
-                console.log('Barcode detected:', result.text);
-                await processBarcode(result.text);
-                return;
-            }
-        } catch (err) {
-            // NoFoundException es normal cuando no hay código
-            if (err.name !== 'NotFoundException') {
-                console.error('ZXing error:', err);
-            }
-        }
-    }
-
-    // Seguir intentando
-    if (barcodeScanning) {
-        requestAnimationFrame(scanBarcode);
+        console.error('Error starting scanner:', err);
+        showManualBarcodeInput();
     }
 }
 
 async function processBarcode(barcode) {
     // Detener escaneo
     barcodeScanning = false;
-    if (barcodeStream) {
-        barcodeStream.getTracks().forEach(track => track.stop());
-        barcodeStream = null;
+    
+    // Detener ZXing usando la API limpia
+    if (window.BarcodeScanner) {
+        window.BarcodeScanner.stop();
     }
     
     // Mostrar loading
@@ -640,9 +605,10 @@ async function lookupBarcode(barcode) {
 function showManualBarcodeInput() {
     // Detener escaneo
     barcodeScanning = false;
-    if (barcodeStream) {
-        barcodeStream.getTracks().forEach(track => track.stop());
-        barcodeStream = null;
+    
+    // Detener ZXing si está corriendo
+    if (window.BarcodeScanner) {
+        window.BarcodeScanner.stop();
     }
     
     // Mostrar input manual
@@ -674,9 +640,9 @@ function submitManualBarcode() {
 function cancelBarcodeScan() {
     barcodeScanning = false;
     
-    if (barcodeStream) {
-        barcodeStream.getTracks().forEach(track => track.stop());
-        barcodeStream = null;
+    // Detener ZXing usando la API limpia
+    if (window.BarcodeScanner) {
+        window.BarcodeScanner.stop();
     }
     
     // Restaurar el video container
