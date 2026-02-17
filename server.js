@@ -4,12 +4,21 @@ const multer = require('multer');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const fs = require('fs').promises;
+const fsSync = require('fs');
+const https = require('https');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3001;
 const DATA_FILE = path.join(__dirname, 'data', 'findings.json');
+
+// Configuración SSL
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
+const ENABLE_HTTP = process.env.ENABLE_HTTP === 'true';
+const HAS_SSL = SSL_CERT_PATH && SSL_KEY_PATH;
 
 // Middleware
 app.use(cors());
@@ -211,18 +220,39 @@ app.delete('/api/findings/:id', async (req, res) => {
 async function start() {
     await ensureDataDir();
     
-    app.listen(PORT, '0.0.0.0', () => {
-        console.log(`Server running on http://localhost:${PORT}`);
-        console.log(`Network access: http://${require('os').hostname()}:${PORT}`);
-        console.log(`API endpoints:`);
-        console.log(`  GET  /api/health`);
-        console.log(`  GET  /api/kmls`);
-        console.log(`  GET  /api/kml/:name`);
-        console.log(`  GET  /api/lookup-barcode?code=...`);
-        console.log(`  GET  /api/findings`);
-        console.log(`  POST /api/findings`);
-        console.log(`  DELETE /api/findings/:id`);
-    });
+    // Iniciar servidor HTTPS si hay certificados
+    if (HAS_SSL) {
+        try {
+            const options = {
+                key: fsSync.readFileSync(SSL_KEY_PATH),
+                cert: fsSync.readFileSync(SSL_CERT_PATH)
+            };
+            
+            https.createServer(options, app).listen(HTTPS_PORT, '0.0.0.0', () => {
+                console.log(`HTTPS Server running on https://localhost:${HTTPS_PORT}`);
+                console.log(`Network access: https://${require('os').hostname()}:${HTTPS_PORT}`);
+            });
+        } catch (err) {
+            console.error('Error starting HTTPS server:', err.message);
+        }
+    }
+    
+    // Iniciar servidor HTTP si no hay SSL o si ENABLE_HTTP=true
+    if (!HAS_SSL || ENABLE_HTTP) {
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log(`HTTP Server running on http://localhost:${PORT}`);
+            console.log(`Network access: http://${require('os').hostname()}:${PORT}`);
+        });
+    }
+    
+    console.log(`API endpoints:`);
+    console.log(`  GET  /api/health`);
+    console.log(`  GET  /api/kmls`);
+    console.log(`  GET  /api/kml/:name`);
+    console.log(`  GET  /api/lookup-barcode?code=...`);
+    console.log(`  GET  /api/findings`);
+    console.log(`  POST /api/findings`);
+    console.log(`  DELETE /api/findings/:id`);
 }
 
 start();
