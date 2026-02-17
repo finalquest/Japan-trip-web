@@ -102,28 +102,43 @@ async function loadRepoKML() {
         const response = await fetch(url);
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const kmlData = await response.text();
+        console.log('KML descargado, tamaño:', kmlData.length);
+        console.log('Primeros 200 chars:', kmlData.substring(0, 200));
         
-        // Procesar el KML
+        if (!kmlData.includes('<kml') && !kmlData.includes('<Placemark')) {
+            throw new Error('El archivo descargado no parece ser un KML válido');
+        }
+        
+        // Parsear para mostrar lista PRIMERO
+        const parser = new DOMParser();
+        const kml = parser.parseFromString(kmlData, 'text/xml');
+        
+        // Verificar si hay errores de parseo
+        const parseError = kml.querySelector('parsererror');
+        if (parseError) {
+            console.error('Error de parseo XML:', parseError.textContent);
+            throw new Error('Error al parsear el XML del KML');
+        }
+        
+        displayKMLPoints(kml);
+        
+        // Procesar el KML en el mapa
         if (mapType === 'google') {
             loadKMLGoogle(kmlData);
         } else {
             loadKMLLeaflet(kmlData);
         }
         
-        // Parsear para mostrar lista
-        const parser = new DOMParser();
-        const kml = parser.parseFromString(kmlData, 'text/xml');
-        displayKMLPoints(kml);
-        
-        alert(`Cargado: ${filename}`);
+        alert(`✅ Cargado: ${filename}`);
         
     } catch (error) {
         console.error('Error cargando KML:', error);
-        alert('Error cargando el KML. Probá de nuevo.');
+        console.error('Stack:', error.stack);
+        alert(`❌ Error: ${error.message}\n\nRevisá la consola (F12) para más detalles.`);
     }
 }
 
