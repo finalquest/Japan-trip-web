@@ -211,8 +211,9 @@ app.delete('/api/findings/:id', async (req, res) => {
 async function start() {
     await ensureDataDir();
     
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running on http://localhost:${PORT}`);
+        console.log(`Network access: http://${require('os').hostname()}:${PORT}`);
         console.log(`API endpoints:`);
         console.log(`  GET  /api/health`);
         console.log(`  GET  /api/kmls`);

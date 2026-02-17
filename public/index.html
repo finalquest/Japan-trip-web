@@ -11,22 +11,6 @@
     <!-- ZXing for barcode scanning -->
     <script src="/zxing-browser.min.js"></script>
     <script src="/barcode-scanner.js"></script>
-    <script>
-        // Verificar que ZXing esté cargado correctamente
-        (function() {
-            // Dar tiempo a que el script se ejecute
-            setTimeout(function() {
-                console.log('=== ZXING DEBUG ===');
-                console.log('ZXingBrowser disponible:', typeof window.ZXingBrowser !== 'undefined');
-                console.log('BarcodeScanner disponible:', typeof window.BarcodeScanner !== 'undefined');
-                if (window.ZXingBrowser) {
-                    console.log('ZXingBrowser keys:', Object.keys(window.ZXingBrowser));
-                }
-                console.log('===================');
-            }, 100);
-        })();
-    </script>
-    
     <script src="config.js"></script>
     <script>
         // Intentar cargar Google Maps si hay API key

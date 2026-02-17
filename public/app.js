@@ -500,9 +500,7 @@ async function startBarcodeScan() {
     const cameraStep = document.getElementById('camera-step');
     const barcodeStep = document.getElementById('barcode-step');
     
-    // Verificar que BarcodeScanner esté disponible
     if (!window.BarcodeScanner) {
-        console.error('BarcodeScanner no está cargado');
         alert('Error: El escáner no está disponible. Recargá la página.');
         return;
     }
@@ -513,20 +511,15 @@ async function startBarcodeScan() {
     barcodeScanning = true;
     
     try {
-        console.log('Iniciando scanner...');
         await window.BarcodeScanner.start(
             video,
             (barcode) => {
-                // onDetected
-                console.log('Código detectado:', barcode);
                 processBarcode(barcode);
             },
             (errorMsg) => {
-                // onError - solo errores graves
-                console.log('Scanner error:', errorMsg);
+                console.error('Scanner error:', errorMsg);
             }
         );
-        console.log('Scanner iniciado correctamente');
     } catch (err) {
         console.error('Error starting scanner:', err);
         showManualBarcodeInput();
