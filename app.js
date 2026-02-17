@@ -512,7 +512,18 @@ async function startBarcodeScan() {
         video.play();
         
         barcodeScanning = true;
-        scanBarcode();
+        // Esperar a que el video esté listo antes de escanear
+        video.addEventListener('loadeddata', () => {
+            console.log('Video ready, starting barcode scan');
+            scanBarcode();
+        }, { once: true });
+        
+        // Timeout de seguridad por si el evento no dispara
+        setTimeout(() => {
+            if (barcodeScanning) {
+                scanBarcode();
+            }
+        }, 1000);
     } catch (err) {
         console.error('Error accessing camera:', err);
         alert('No se pudo acceder a la cámara. Asegurate de dar permisos.');
@@ -522,14 +533,21 @@ async function startBarcodeScan() {
 
 async function scanBarcode() {
     if (!barcodeScanning) return;
-    
+
     const video = document.getElementById('barcode-video');
-    
+
+    // Verificar que el video esté listo
+    if (video.readyState < 2) {
+        if (barcodeScanning) {
+            requestAnimationFrame(scanBarcode);
+        }
+        return;
+    }
+
     // Usar BarcodeDetector API si está disponible
     if ('BarcodeDetector' in window) {
-        const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93'] });
-        
         try {
+            const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93'] });
             const barcodes = await barcodeDetector.detect(video);
             if (barcodes.length > 0) {
                 const barcode = barcodes[0].rawValue;
@@ -538,10 +556,13 @@ async function scanBarcode() {
                 return;
             }
         } catch (err) {
-            console.error('Barcode detection error:', err);
+            // Solo loguear errores que no sean de estado inválido
+            if (err.name !== 'InvalidStateError') {
+                console.error('Barcode detection error:', err);
+            }
         }
     }
-    
+
     // Si no hay BarcodeDetector o no detectó, seguir intentando
     if (barcodeScanning) {
         requestAnimationFrame(scanBarcode);
@@ -594,39 +615,36 @@ async function processBarcode(barcode) {
 }
 
 async function lookupBarcode(barcode) {
-    // Intentar con go-upc.com
+    // Usar corsproxy.io para evitar CORS
     try {
-        const response = await fetch(`https://go-upc.com/search?q=${encodeURIComponent(barcode)}`, {
-            headers: {
-                'Accept': 'text/html'
-            }
-        });
+        const targetUrl = `https://go-upc.com/search?q=${encodeURIComponent(barcode)}`;
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        
+        const response = await fetch(proxyUrl);
         
         if (!response.ok) return null;
         
         const html = await response.text();
         
-        // Parsear HTML (simple)
+        // Parsear HTML
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         
-        // Extraer datos (ajustar selectores según la estructura real de go-upc)
+        // Extraer nombre del producto
         const name = doc.querySelector('h1')?.textContent?.trim() || 
                     doc.querySelector('.product-name')?.textContent?.trim() ||
                     doc.querySelector('[itemprop="name"]')?.textContent?.trim();
         
-        const image = doc.querySelector('img')?.src ||
-                     doc.querySelector('.product-image img')?.src ||
-                     doc.querySelector('[itemprop="image"]')?.src;
+        const image = doc.querySelector('.product-image img')?.src ||
+                     doc.querySelector('img')?.src;
         
-        const description = doc.querySelector('.description')?.textContent?.trim() ||
-                           doc.querySelector('[itemprop="description"]')?.textContent?.trim();
+        const description = doc.querySelector('.description')?.textContent?.trim();
         
         if (name) {
             return { name, image, description };
         }
     } catch (err) {
-        console.error('go-upc lookup error:', err);
+        console.error('Barcode lookup error:', err);
     }
     
     return null;
