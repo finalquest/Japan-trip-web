@@ -215,13 +215,54 @@ function loadKML(file) {
 }
 
 function loadKMLGoogle(kmlData) {
-    const blob = new Blob([kmlData], { type: 'application/vnd.google-earth.kml+xml' });
-    const url = URL.createObjectURL(blob);
+    // Parsear KML manualmente porque KmlLayer necesita URL pública
+    const parser = new DOMParser();
+    const kml = parser.parseFromString(kmlData, 'text/xml');
     
-    const kmlLayer = new google.maps.KmlLayer({
-        url: url,
-        map: map
+    const placemarks = kml.querySelectorAll('Placemark');
+    const bounds = new google.maps.LatLngBounds();
+    
+    // Limpiar marcadores anteriores
+    mapMarkers.forEach(m => m.setMap(null));
+    mapMarkers = [];
+    
+    placemarks.forEach((placemark, i) => {
+        // Solo procesar puntos (no LineString/rutas)
+        const point = placemark.querySelector('Point');
+        if (!point) return;
+        
+        const name = getPlacemarkName(placemark, i);
+        const extendedData = placemark.querySelector('ExtendedData');
+        const address = extendedData?.querySelector('Data[name="address"] value')?.textContent || '';
+        const coords = point.querySelector('coordinates')?.textContent?.trim();
+        
+        if (coords) {
+            const [lng, lat] = coords.split(',').map(Number);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const position = { lat, lng };
+                bounds.extend(position);
+                
+                const marker = new google.maps.Marker({
+                    position: position,
+                    map: map,
+                    title: name
+                });
+                
+                const content = address 
+                    ? `<strong>${name}</strong><br><small>${address}</small>`
+                    : `<strong>${name}</strong>`;
+                
+                const infowindow = new google.maps.InfoWindow({ content });
+                marker.addListener('click', () => infowindow.open(map, marker));
+                
+                mapMarkers.push(marker);
+            }
+        }
     });
+    
+    if (!bounds.isEmpty()) {
+        map.fitBounds(bounds);
+    }
 }
 
 function loadKMLLeaflet(kmlData) {
