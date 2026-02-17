@@ -123,23 +123,41 @@ main {
 .camera-only {
     text-align: center;
     padding: 1rem 0;
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
 }
 
-.btn-camera-large {
-    width: 120px;
-    height: 120px;
+.capture-options {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.option-label {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.btn-camera-large, .btn-barcode-large {
+    width: 100px;
+    height: 100px;
     border-radius: 50%;
-    background: #1a73e8;
-    color: white;
     border: none;
-    font-size: 2.5rem;
+    font-size: 2rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto;
-    box-shadow: 0 4px 15px rgba(26, 115, 232, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     transition: all 0.2s;
+}
+
+.btn-camera-large {
+    background: #1a73e8;
+    color: white;
 }
 
 .btn-camera-large:hover {
@@ -148,7 +166,18 @@ main {
     box-shadow: 0 6px 20px rgba(26, 115, 232, 0.5);
 }
 
-.btn-camera-large:active {
+.btn-barcode-large {
+    background: #34a853;
+    color: white;
+}
+
+.btn-barcode-large:hover {
+    background: #2d8a47;
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(52, 168, 83, 0.5);
+}
+
+.btn-camera-large:active, .btn-barcode-large:active {
     transform: scale(0.95);
 }
 
@@ -183,6 +212,57 @@ main {
 
 .btn-retake:hover {
     background: #555;
+}
+
+/* Escáner de código de barras */
+.barcode-scanner {
+    text-align: center;
+}
+
+#barcode-video-container {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto 1rem;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+#barcode-video {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.scan-line {
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: #00ff00;
+    box-shadow: 0 0 10px #00ff00;
+    animation: scan 2s ease-in-out infinite;
+}
+
+@keyframes scan {
+    0%, 100% { transform: translateY(-50px); opacity: 0; }
+    50% { transform: translateY(50px); opacity: 1; }
+}
+
+.btn-cancel {
+    padding: 0.75rem 1.5rem;
+    background: #ea4335;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.btn-cancel:hover {
+    background: #d33b28;
 }
 
 .divider {

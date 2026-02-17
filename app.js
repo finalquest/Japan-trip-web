@@ -68,6 +68,10 @@ async function loadKMLList() {
 // Variable global para el infowindow actual (Google Maps)
 let currentInfoWindow = null;
 
+// Variable para el escáner de barcode
+let barcodeStream = null;
+let barcodeScanning = false;
+
 // Cargar KML seleccionado del repo
 async function loadRepoKML() {
     const select = document.getElementById('repo-kml-select');
@@ -491,6 +495,155 @@ function getCurrentLocation() {
     }
 }
 
+// Funciones para escanear código de barras
+async function startBarcodeScan() {
+    const video = document.getElementById('barcode-video');
+    const cameraStep = document.getElementById('camera-step');
+    const barcodeStep = document.getElementById('barcode-step');
+    
+    cameraStep.style.display = 'none';
+    barcodeStep.style.display = 'block';
+    
+    try {
+        barcodeStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        });
+        video.srcObject = barcodeStream;
+        video.play();
+        
+        barcodeScanning = true;
+        scanBarcode();
+    } catch (err) {
+        console.error('Error accessing camera:', err);
+        alert('No se pudo acceder a la cámara. Asegurate de dar permisos.');
+        cancelBarcodeScan();
+    }
+}
+
+async function scanBarcode() {
+    if (!barcodeScanning) return;
+    
+    const video = document.getElementById('barcode-video');
+    
+    // Usar BarcodeDetector API si está disponible
+    if ('BarcodeDetector' in window) {
+        const barcodeDetector = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93'] });
+        
+        try {
+            const barcodes = await barcodeDetector.detect(video);
+            if (barcodes.length > 0) {
+                const barcode = barcodes[0].rawValue;
+                console.log('Barcode detected:', barcode);
+                await processBarcode(barcode);
+                return;
+            }
+        } catch (err) {
+            console.error('Barcode detection error:', err);
+        }
+    }
+    
+    // Si no hay BarcodeDetector o no detectó, seguir intentando
+    if (barcodeScanning) {
+        requestAnimationFrame(scanBarcode);
+    }
+}
+
+async function processBarcode(barcode) {
+    // Detener escaneo
+    barcodeScanning = false;
+    if (barcodeStream) {
+        barcodeStream.getTracks().forEach(track => track.stop());
+        barcodeStream = null;
+    }
+    
+    // Mostrar loading
+    showNotification(`🔍 Buscando producto: ${barcode}...`);
+    
+    try {
+        // Buscar en go-upc.com
+        const product = await lookupBarcode(barcode);
+        
+        if (product) {
+            // Pre-llenar formulario
+            document.getElementById('finding-title').value = product.name || '';
+            document.getElementById('finding-desc').value = product.description || '';
+            
+            // Si hay imagen, mostrarla
+            if (product.image) {
+                const img = document.getElementById('photo-preview');
+                img.src = product.image;
+            }
+            
+            showNotification('✅ Producto encontrado');
+        } else {
+            showNotification('⚠️ Producto no encontrado. Agregá los datos manualmente.');
+        }
+        
+        // Mostrar formulario
+        document.getElementById('barcode-step').style.display = 'none';
+        document.getElementById('finding-form').style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error looking up barcode:', error);
+        showNotification('❌ Error buscando producto');
+        
+        // Mostrar formulario igual
+        document.getElementById('barcode-step').style.display = 'none';
+        document.getElementById('finding-form').style.display = 'block';
+    }
+}
+
+async function lookupBarcode(barcode) {
+    // Intentar con go-upc.com
+    try {
+        const response = await fetch(`https://go-upc.com/search?q=${encodeURIComponent(barcode)}`, {
+            headers: {
+                'Accept': 'text/html'
+            }
+        });
+        
+        if (!response.ok) return null;
+        
+        const html = await response.text();
+        
+        // Parsear HTML (simple)
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Extraer datos (ajustar selectores según la estructura real de go-upc)
+        const name = doc.querySelector('h1')?.textContent?.trim() || 
+                    doc.querySelector('.product-name')?.textContent?.trim() ||
+                    doc.querySelector('[itemprop="name"]')?.textContent?.trim();
+        
+        const image = doc.querySelector('img')?.src ||
+                     doc.querySelector('.product-image img')?.src ||
+                     doc.querySelector('[itemprop="image"]')?.src;
+        
+        const description = doc.querySelector('.description')?.textContent?.trim() ||
+                           doc.querySelector('[itemprop="description"]')?.textContent?.trim();
+        
+        if (name) {
+            return { name, image, description };
+        }
+    } catch (err) {
+        console.error('go-upc lookup error:', err);
+    }
+    
+    return null;
+}
+
+function cancelBarcodeScan() {
+    barcodeScanning = false;
+    
+    if (barcodeStream) {
+        barcodeStream.getTracks().forEach(track => track.stop());
+        barcodeStream = null;
+    }
+    
+    document.getElementById('barcode-step').style.display = 'none';
+    document.getElementById('camera-step').style.display = 'block';
+}
+
 // Preview de foto y mostrar formulario
 document.getElementById('finding-photo')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -622,6 +775,8 @@ window.toggleTag = toggleTag;
 window.getCurrentLocation = getCurrentLocation;
 window.deleteFinding = deleteFinding;
 window.retakePhoto = retakePhoto;
+window.startBarcodeScan = startBarcodeScan;
+window.cancelBarcodeScan = cancelBarcodeScan;
 
 function setupEventListeners() {
     // Cualquier setup adicional

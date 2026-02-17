@@ -90,13 +90,33 @@
             <div class="add-finding">
                 <h2>📸 Encontré algo interesante</h2>
                 
-                <!-- Paso 1: Solo el botón de cámara -->
+                <!-- Paso 1: Elegir entre foto o barcode -->
                 <div id="camera-step" class="camera-only">
+                    <div class="capture-options">
+                        <button type="button" class="btn-camera-large" onclick="document.getElementById('finding-photo').click()">
+                            📸
+                        </button>
+                        <span class="option-label">Foto</span>
+                    </div>
+                    
+                    <div class="capture-options">
+                        <button type="button" class="btn-barcode-large" onclick="startBarcodeScan()">
+                            📊
+                        </button>
+                        <span class="option-label">Código de barras</span>
+                    </div>
+                    
                     <input type="file" id="finding-photo" accept="image/*" capture="environment" required style="display: none;">
-                    <button type="button" id="camera-btn" class="btn-camera-large" onclick="document.getElementById('finding-photo').click()">
-                        📸 Sacar Foto
-                    </button>
-                    <p class="camera-hint">Sacá una foto del producto que encontraste</p>
+                    <p class="camera-hint">Elegí cómo capturar el producto</p>
+                </div>
+                
+                <!-- Paso 1b: Escanear barcode -->
+                <div id="barcode-step" class="barcode-scanner" style="display: none;">
+                    <div id="barcode-video-container">
+                        <video id="barcode-video" playsinline></video>
+                        <div class="scan-line"></div>
+                    </div>
+                    <button type="button" class="btn-cancel" onclick="cancelBarcodeScan()">❌ Cancelar</button>
                 </div>
                 
                 <!-- Paso 2: Formulario completo (aparece después de sacar foto) -->
