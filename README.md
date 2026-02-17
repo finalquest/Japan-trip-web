@@ -19,9 +19,16 @@ Web app simple para planificar y documentar tu viaje a Japón.
 ## Cómo usar
 
 ### Setup inicial
+
+### Opción A: Sin API key (OpenStreetMap)
+Simplemente abrí `index.html`. La app usará OpenStreetMap automáticamente.
+
+### Opción B: Con Google Maps (mejor calidad de mapas)
 1. Copiá `config.js.example` a `config.js`
 2. Editá `config.js` y agregá tu Google Maps API key
 3. Abrí `index.html` en tu navegador
+
+La app detecta automáticamente si hay API key y usa Google Maps. Si no, usa OpenStreetMap.
 
 ### Local (sin instalar nada)
 1. Abrí el archivo `index.html` en tu navegador

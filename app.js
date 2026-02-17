@@ -1,6 +1,8 @@
 // Estado global
 let map;
+let mapType = 'google'; // 'google' o 'leaflet'
 let currentFindings = [];
+let mapMarkers = [];
 
 // Inicializar
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,16 +20,49 @@ function showTab(tabName) {
     event.target.classList.add('active');
     
     if (tabName === 'map' && map) {
-        google.maps.event.trigger(map, 'resize');
+        if (mapType === 'google') {
+            google.maps.event.trigger(map, 'resize');
+        } else if (mapType === 'leaflet') {
+            map.invalidateSize();
+        }
     }
 }
 
-// Inicializar mapa
+// Inicializar mapa (Google o OpenStreetMap)
 function initMap() {
+    const mapContainer = document.getElementById('map-container');
+    
+    // Esperar a que se cargue alguna librería
+    setTimeout(() => {
+        if (window.google && window.google.maps && window.USE_GOOGLE_MAPS) {
+            initGoogleMap();
+        } else if (window.L) {
+            initLeafletMap();
+        } else {
+            // Si ninguna cargó, esperar un poco más
+            setTimeout(initMap, 500);
+        }
+    }, 100);
+}
+
+function initGoogleMap() {
+    mapType = 'google';
     map = new google.maps.Map(document.getElementById('map-container'), {
-        center: { lat: 35.6762, lng: 139.6503 }, // Tokyo
+        center: { lat: 35.6762, lng: 139.6503 },
         zoom: 12
     });
+    console.log('Usando Google Maps');
+}
+
+function initLeafletMap() {
+    mapType = 'leaflet';
+    map = L.map('map-container').setView([35.6762, 139.6503], 12);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    console.log('Usando OpenStreetMap (Leaflet)');
 }
 
 // Cargar KML
@@ -36,31 +71,41 @@ function loadKML(file) {
     reader.onload = (e) => {
         const kmlData = e.target.result;
         
-        // Parsear KML básico para mostrar puntos
+        if (mapType === 'google') {
+            loadKMLGoogle(kmlData);
+        } else {
+            loadKMLLeaflet(kmlData);
+        }
+        
+        // Parsear para mostrar lista
         const parser = new DOMParser();
         const kml = parser.parseFromString(kmlData, 'text/xml');
-        
-        // Limpiar mapa anterior
-        map.data.forEach(feature => map.data.remove(feature));
-        
-        // Agregar KML al mapa
-        const kmlLayer = new google.maps.KmlLayer({
-            url: URL.createObjectURL(new Blob([kmlData], { type: 'application/vnd.google-earth.kml+xml' })),
-            map: map
-        });
-        
-        // También parsear manualmente para mostrar lista
         displayKMLPoints(kml);
     };
     reader.readAsText(file);
 }
 
-function displayKMLPoints(kmlDoc) {
-    const placemarks = kmlDoc.querySelectorAll('Placemark');
-    const infoDiv = document.getElementById('route-info');
-    let html = `<h3>Puntos en el itinerario (${placemarks.length})</h3><ul>`;
+function loadKMLGoogle(kmlData) {
+    const blob = new Blob([kmlData], { type: 'application/vnd.google-earth.kml+xml' });
+    const url = URL.createObjectURL(blob);
     
-    const bounds = new google.maps.LatLngBounds();
+    const kmlLayer = new google.maps.KmlLayer({
+        url: url,
+        map: map
+    });
+}
+
+function loadKMLLeaflet(kmlData) {
+    // Para Leaflet necesitamos parsear manualmente
+    const parser = new DOMParser();
+    const kml = parser.parseFromString(kmlData, 'text/xml');
+    
+    const placemarks = kml.querySelectorAll('Placemark');
+    const bounds = L.latLngBounds();
+    
+    // Limpiar marcadores anteriores
+    mapMarkers.forEach(m => map.removeLayer(m));
+    mapMarkers = [];
     
     placemarks.forEach((placemark, i) => {
         const name = placemark.querySelector('name')?.textContent || `Punto ${i+1}`;
@@ -70,31 +115,36 @@ function displayKMLPoints(kmlDoc) {
         if (coords) {
             const [lng, lat] = coords.split(',').map(Number);
             if (!isNaN(lat) && !isNaN(lng)) {
-                bounds.extend({ lat, lng });
+                bounds.extend([lat, lng]);
                 
-                const marker = new google.maps.Marker({
-                    position: { lat, lng },
-                    map: map,
-                    title: name
-                });
+                const marker = L.marker([lat, lng])
+                    .bindPopup(`<strong>${name}</strong><br>${desc}`)
+                    .addTo(map);
                 
-                const infowindow = new google.maps.InfoWindow({
-                    content: `<strong>${name}</strong><br>${desc}`
-                });
-                
-                marker.addListener('click', () => infowindow.open(map, marker));
+                mapMarkers.push(marker);
             }
         }
+    });
+    
+    if (bounds.isValid()) {
+        map.fitBounds(bounds);
+    }
+}
+
+function displayKMLPoints(kmlDoc) {
+    const placemarks = kmlDoc.querySelectorAll('Placemark');
+    const infoDiv = document.getElementById('route-info');
+    let html = `<h3>Puntos en el itinerario (${placemarks.length})</h3><ul>`;
+    
+    placemarks.forEach((placemark, i) => {
+        const name = placemark.querySelector('name')?.textContent || `Punto ${i+1}`;
+        const desc = placemark.querySelector('description')?.textContent || '';
         
         html += `<li><strong>${name}</strong>${desc ? ': ' + desc.substring(0, 50) + '...' : ''}</li>`;
     });
     
     html += '</ul>';
     infoDiv.innerHTML = html;
-    
-    if (!bounds.isEmpty()) {
-        map.fitBounds(bounds);
-    }
 }
 
 // Manejo de archivos
