@@ -11,39 +11,6 @@
     <!-- ZXing for barcode scanning -->
     <script src="/zxing-browser.min.js"></script>
     <script src="/barcode-scanner.js"></script>
-    <script src="config.js"></script>
-    <script>
-        // Intentar cargar Google Maps si hay API key
-        window.USE_GOOGLE_MAPS = false;
-        if (typeof CONFIG !== 'undefined' && CONFIG.GOOGLE_MAPS_API_KEY && CONFIG.GOOGLE_MAPS_API_KEY !== 'TU_API_KEY_AQUI') {
-            const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${CONFIG.GOOGLE_MAPS_API_KEY}&libraries=places&callback=onGoogleMapsLoaded`;
-            script.async = true;
-            script.defer = true;
-            script.onerror = function() {
-                console.log('Google Maps no cargó, usando OpenStreetMap');
-                loadOpenStreetMap();
-            };
-            document.head.appendChild(script);
-        } else {
-            console.log('No hay API key de Google Maps, usando OpenStreetMap');
-            window.onload = loadOpenStreetMap;
-        }
-        
-        function onGoogleMapsLoaded() {
-            window.USE_GOOGLE_MAPS = true;
-            console.log('Google Maps cargado correctamente');
-        }
-        
-        function loadOpenStreetMap() {
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-            script.onload = function() {
-                console.log('OpenStreetMap (Leaflet) cargado');
-            };
-            document.head.appendChild(script);
-        }
-    </script>
 </head>
 <body>
     <nav class="navbar">

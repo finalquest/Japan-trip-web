@@ -34,6 +34,7 @@ async function login(username, password) {
         
         hideLoginModal();
         showUserInfo();
+        await loadConfig();
         initApp();
         
         return true;
@@ -63,6 +64,7 @@ async function checkAuth() {
         currentUser = await response.json();
         hideLoginModal();
         showUserInfo();
+        await loadConfig();
         initApp();
         return true;
     } catch (err) {
@@ -217,3 +219,59 @@ window.currentUser = () => currentUser;
 window.showUsersModal = showUsersModal;
 window.closeUsersModal = closeUsersModal;
 window.deleteUser = deleteUser;
+
+// Config y carga de mapas
+let appConfig = null;
+
+async function loadConfig() {
+    try {
+        const response = await fetch(`${API_BASE}/api/config`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) throw new Error('Failed to load config');
+        
+        appConfig = await response.json();
+        
+        if (appConfig.googleMapsApiKey) {
+            await loadGoogleMaps(appConfig.googleMapsApiKey);
+        } else {
+            loadOpenStreetMap();
+        }
+    } catch (err) {
+        console.error('Error loading config:', err);
+        loadOpenStreetMap();
+    }
+}
+
+function loadGoogleMaps(apiKey) {
+    return new Promise((resolve, reject) => {
+        window.USE_GOOGLE_MAPS = false;
+        
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=onGoogleMapsLoaded`;
+        script.async = true;
+        script.defer = true;
+        
+        window.onGoogleMapsLoaded = function() {
+            window.USE_GOOGLE_MAPS = true;
+            resolve();
+        };
+        
+        script.onerror = function() {
+            console.error('Google Maps failed to load');
+            loadOpenStreetMap();
+            reject();
+        };
+        
+        document.head.appendChild(script);
+    });
+}
+
+function loadOpenStreetMap() {
+    window.USE_GOOGLE_MAPS = false;
+    
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    document.head.appendChild(script);
+}
