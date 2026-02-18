@@ -21,32 +21,20 @@ function initApp() {
 // Exportar para usar desde auth.js
 window.initApp = initApp;
 
-// Cargar lista de KMLs desde el repo usando GitHub API
+// Cargar lista de KMLs desde nuestro backend (que hace proxy a GitHub)
 async function loadKMLList() {
     const select = document.getElementById('repo-kml-select');
     
     try {
-        // Usar GitHub API para listar archivos de la carpeta maps
-        const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${KML_FOLDER}`;
-        console.log('Fetching KML list from:', apiUrl);
-        
-        const response = await fetch(apiUrl, {
+        const response = await fetch(`${API_BASE}/api/kmls`, {
             headers: getAuthHeaders()
         });
         
         if (!response.ok) {
-            throw new Error(`GitHub API error: ${response.status}`);
+            throw new Error(`API error: ${response.status}`);
         }
         
-        const files = await response.json();
-        
-        // Filtrar solo archivos .kml
-        const kmlFiles = files
-            .filter(file => file.type === 'file' && file.name.endsWith('.kml'))
-            .map(file => file.name)
-            .sort();
-        
-        console.log(`Found ${kmlFiles.length} KML files`);
+        const kmls = await response.json();
         
         // Limpiar opciones existentes (excepto la primera)
         while (select.options.length > 1) {
@@ -54,18 +42,17 @@ async function loadKMLList() {
         }
         
         // Agregar archivos al dropdown
-        kmlFiles.forEach(file => {
+        kmls.forEach(kml => {
             const option = document.createElement('option');
-            option.value = file;
-            option.textContent = file.replace('.kml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            option.value = kml.name;
+            option.textContent = kml.name.replace('.kml', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             select.appendChild(option);
         });
         
-        showNotification(`📂 ${kmlFiles.length} itinerarios cargados`);
+        showNotification(`📂 ${kmls.length} itinerarios cargados`);
         
     } catch (error) {
         console.error('Error loading KML list:', error);
-        // Fallback: mostrar mensaje y dejar el select vacío
         showNotification('⚠️ No se pudo cargar la lista automáticamente');
     }
 }
@@ -95,7 +82,6 @@ async function loadRepoKML() {
             currentInfoWindow = null;
         }
         
-        console.log('Cargando KML desde:', url);
         const response = await fetch(url);
         
         if (!response.ok) {
@@ -103,7 +89,6 @@ async function loadRepoKML() {
         }
         
         const kmlData = await response.text();
-        console.log('KML descargado, tamaño:', kmlData.length);
         
         if (!kmlData.includes('<kml') && !kmlData.includes('<Placemark')) {
             throw new Error('El archivo descargado no parece ser un KML válido');
@@ -206,7 +191,6 @@ function initGoogleMap() {
         center: { lat: 35.6762, lng: 139.6503 },
         zoom: 12
     });
-    console.log('Usando Google Maps');
 }
 
 function initLeafletMap() {
@@ -217,7 +201,6 @@ function initLeafletMap() {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
     
-    console.log('Usando OpenStreetMap (Leaflet)');
 }
 
 // Cambiar a modo visualización
@@ -730,8 +713,7 @@ document.getElementById('finding-form')?.addEventListener('submit', async (e) =>
     }
 });
 
-// API Functions
-const API_BASE = '';
+// API Functions (API_BASE is defined in auth.js)
 
 async function loadFindings() {
     try {

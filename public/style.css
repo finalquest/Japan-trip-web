@@ -17,6 +17,16 @@ body {
     position: sticky;
     top: 0;
     z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.navbar h1 {
+    margin: 0;
+    font-size: 1.5rem;
 }
 
 .navbar h1 {
@@ -27,16 +37,19 @@ body {
 .nav-tabs {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: nowrap;
+    align-items: center;
 }
 
 .tab-btn {
-    padding: 0.75rem 1.5rem;
+    padding: 0.5rem 1rem;
     border: none;
     background: #e0e0e0;
     cursor: pointer;
-    border-radius: 8px;
-    font-size: 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .tab-btn:hover {

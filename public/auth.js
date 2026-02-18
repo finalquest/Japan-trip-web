@@ -63,6 +63,7 @@ async function checkAuth() {
         currentUser = await response.json();
         hideLoginModal();
         showUserInfo();
+        initApp();
         return true;
     } catch (err) {
         console.error('Auth check failed:', err);
