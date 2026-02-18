@@ -51,6 +51,10 @@
         <div class="nav-tabs">
             <button class="tab-btn active" onclick="showTab('map')">🗺️ Itinerario (KML)</button>
             <button class="tab-btn" onclick="showTab('findings')">📸 Encontré Esto</button>
+            <button class="tab-btn" onclick="showUsersModal()" id="users-btn" style="display: none;">⚙️ Usuarios</button>
+        </div>
+        <div class="user-info" id="user-info" style="display: none;">
+            <span id="current-user"></span>
         </div>
     </nav>
 
@@ -172,6 +176,54 @@
         </section>
     </main>
 
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <h2>🔐 Iniciar Sesión</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Usuario:</label>
+                    <input type="text" id="login-username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña:</label>
+                    <input type="password" id="login-password" required autocomplete="current-password">
+                </div>
+                <div id="login-error" class="error-message" style="display: none; color: red; margin-bottom: 1rem;"></div>
+                <button type="submit" class="btn-primary">Ingresar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Users Management Modal -->
+    <div id="users-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>👥 Gestión de Usuarios</h2>
+                <button onclick="closeUsersModal()" class="btn-close">✕</button>
+            </div>
+            
+            <div class="users-list-container">
+                <h3>Usuarios existentes:</h3>
+                <div id="users-list"></div>
+            </div>
+            
+            <div class="add-user-form">
+                <h3>Agregar nuevo usuario:</h3>
+                <form id="add-user-form">
+                    <div class="form-group">
+                        <input type="text" id="new-username" placeholder="Nombre de usuario" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="new-password" placeholder="Contraseña" required>
+                    </div>
+                    <button type="submit" class="btn-secondary">Agregar Usuario</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

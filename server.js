@@ -8,11 +8,17 @@ const fsSync = require('fs');
 const https = require('https');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const DATA_FILE = path.join(__dirname, 'data', 'findings.json');
+const USERS_FILE = path.join(__dirname, 'data', 'users.json');
+const ADMIN_USER = process.env.ADMIN_USER || 'admin';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 
 // Configuración SSL
 const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
@@ -24,6 +30,24 @@ const HAS_SSL = SSL_CERT_PATH && SSL_KEY_PATH;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+// Middleware de autenticación
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+        return res.status(401).json({ error: 'Access token required' });
+    }
+    
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'Invalid token' });
+        }
+        req.user = user;
+        next();
+    });
+};
 
 // Asegurar que existe el directorio data
 async function ensureDataDir() {
@@ -50,6 +74,41 @@ async function saveFindings(findings) {
     await fs.writeFile(DATA_FILE, JSON.stringify(findings, null, 2));
 }
 
+// Leer usuarios
+async function readUsers() {
+    try {
+        const data = await fs.readFile(USERS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch {
+        return [];
+    }
+}
+
+// Guardar usuarios
+async function saveUsers(users) {
+    await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+// Crear usuario admin inicial
+async function createAdminUser() {
+    const users = await readUsers();
+    const adminExists = users.find(u => u.username === ADMIN_USER);
+    
+    if (!adminExists) {
+        const hashedPassword = await bcrypt.hash(ADMIN_PASS, 10);
+        const admin = {
+            id: uuidv4(),
+            username: ADMIN_USER,
+            passwordHash: hashedPassword,
+            isAdmin: true,
+            createdAt: new Date().toISOString()
+        };
+        users.push(admin);
+        await saveUsers(users);
+        console.log(`Admin user '${ADMIN_USER}' created successfully`);
+    }
+}
+
 // Configurar multer para uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -66,15 +125,151 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ==================== ROUTES ====================
+// ==================== AUTH ROUTES ====================
 
-// Health check
+// Login
+app.post('/api/auth/login', async (req, res) => {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password required' });
+    }
+    
+    try {
+        const users = await readUsers();
+        const user = users.find(u => u.username === username);
+        
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        
+        const validPassword = await bcrypt.compare(password, user.passwordHash);
+        
+        if (!validPassword) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        
+        const token = jwt.sign(
+            { userId: user.id, username: user.username, isAdmin: user.isAdmin },
+            JWT_SECRET
+        );
+        
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                isAdmin: user.isAdmin
+            }
+        });
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ error: 'Login failed' });
+    }
+});
+
+// Get current user
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+    res.json({
+        userId: req.user.userId,
+        username: req.user.username,
+        isAdmin: req.user.isAdmin
+    });
+});
+
+// ==================== USER ROUTES ====================
+
+// Listar usuarios
+app.get('/api/users', authenticateToken, async (req, res) => {
+    try {
+        const users = await readUsers();
+        const safeUsers = users.map(u => ({
+            id: u.id,
+            username: u.username,
+            isAdmin: u.isAdmin,
+            createdAt: u.createdAt
+        }));
+        res.json(safeUsers);
+    } catch (err) {
+        console.error('Error reading users:', err);
+        res.status(500).json({ error: 'Failed to read users' });
+    }
+});
+
+// Crear usuario
+app.post('/api/users', authenticateToken, async (req, res) => {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password required' });
+    }
+    
+    try {
+        const users = await readUsers();
+        
+        if (users.find(u => u.username === username)) {
+            return res.status(400).json({ error: 'Username already exists' });
+        }
+        
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = {
+            id: uuidv4(),
+            username,
+            passwordHash: hashedPassword,
+            isAdmin: false,
+            createdAt: new Date().toISOString()
+        };
+        
+        users.push(newUser);
+        await saveUsers(users);
+        
+        res.status(201).json({
+            id: newUser.id,
+            username: newUser.username,
+            isAdmin: newUser.isAdmin,
+            createdAt: newUser.createdAt
+        });
+    } catch (err) {
+        console.error('Error creating user:', err);
+        res.status(500).json({ error: 'Failed to create user' });
+    }
+});
+
+// Eliminar usuario
+app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+        let users = await readUsers();
+        const user = users.find(u => u.id === id);
+        
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        if (user.isAdmin) {
+            return res.status(403).json({ error: 'Cannot delete admin user' });
+        }
+        
+        users = users.filter(u => u.id !== id);
+        await saveUsers(users);
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting user:', err);
+        res.status(500).json({ error: 'Failed to delete user' });
+    }
+});
+
+// ==================== PROTECTED ROUTES ====================
+
+// Health check (público)
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Listar KMLs desde GitHub
-app.get('/api/kmls', async (req, res) => {
+app.get('/api/kmls', authenticateToken, async (req, res) => {
     try {
         const response = await axios.get('https://api.github.com/repos/finalquest/tokyo2026/contents/maps');
         const kmls = response.data
@@ -91,7 +286,7 @@ app.get('/api/kmls', async (req, res) => {
 });
 
 // Obtener un KML específico
-app.get('/api/kml/:name', async (req, res) => {
+app.get('/api/kml/:name', authenticateToken, async (req, res) => {
     try {
         const name = req.params.name;
         const url = `https://raw.githubusercontent.com/finalquest/tokyo2026/master/maps/${encodeURIComponent(name)}`;
@@ -104,8 +299,8 @@ app.get('/api/kml/:name', async (req, res) => {
     }
 });
 
-// Lookup de barcode (proxy a go-upc)
-app.get('/api/lookup-barcode', async (req, res) => {
+// Lookup de barcode
+app.get('/api/lookup-barcode', authenticateToken, async (req, res) => {
     const { code } = req.query;
     
     if (!code) {
@@ -147,7 +342,7 @@ app.get('/api/lookup-barcode', async (req, res) => {
 });
 
 // Obtener todos los hallazgos
-app.get('/api/findings', async (req, res) => {
+app.get('/api/findings', authenticateToken, async (req, res) => {
     try {
         const findings = await readFindings();
         res.json(findings);
@@ -158,7 +353,7 @@ app.get('/api/findings', async (req, res) => {
 });
 
 // Crear un hallazgo
-app.post('/api/findings', upload.single('photo'), async (req, res) => {
+app.post('/api/findings', authenticateToken, upload.single('photo'), async (req, res) => {
     try {
         const { title, description, location, lat, lng, tags } = req.body;
         
@@ -171,6 +366,8 @@ app.post('/api/findings', upload.single('photo'), async (req, res) => {
             lng: lng ? parseFloat(lng) : null,
             tags: tags ? tags.split(',') : [],
             photoUrl: req.file ? `/uploads/${req.file.filename}` : null,
+            createdBy: req.user.username,
+            userId: req.user.userId,
             createdAt: new Date().toISOString()
         };
         
@@ -186,7 +383,7 @@ app.post('/api/findings', upload.single('photo'), async (req, res) => {
 });
 
 // Eliminar un hallazgo
-app.delete('/api/findings/:id', async (req, res) => {
+app.delete('/api/findings/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         let findings = await readFindings();
@@ -219,6 +416,7 @@ app.delete('/api/findings/:id', async (req, res) => {
 // Iniciar servidor
 async function start() {
     await ensureDataDir();
+    await createAdminUser();
     
     // Iniciar servidor HTTPS si hay certificados
     if (HAS_SSL) {
@@ -246,7 +444,11 @@ async function start() {
     }
     
     console.log(`API endpoints:`);
-    console.log(`  GET  /api/health`);
+    console.log(`  POST /api/auth/login`);
+    console.log(`  GET  /api/auth/me`);
+    console.log(`  GET  /api/users`);
+    console.log(`  POST /api/users`);
+    console.log(`  DELETE /api/users/:id`);
     console.log(`  GET  /api/kmls`);
     console.log(`  GET  /api/kml/:name`);
     console.log(`  GET  /api/lookup-barcode?code=...`);

@@ -559,3 +559,120 @@ main {
         grid-template-columns: 1fr;
     }
 }
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.modal-header h2 {
+    margin: 0;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    line-height: 1;
+}
+
+.btn-close:hover {
+    background: #f0f0f0;
+    border-radius: 4px;
+}
+
+/* User Info */
+.user-info {
+    margin-left: auto;
+    padding: 0.5rem 1rem;
+    background: #f0f0f0;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+/* Users List */
+.users-list-container {
+    margin-bottom: 2rem;
+}
+
+.users-list-container h3 {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+.user-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: #f8f8f8;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.user-item .username {
+    font-weight: 500;
+}
+
+.btn-delete {
+    background: #ff4444;
+    color: white;
+    border: none;
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-delete:hover {
+    background: #cc0000;
+}
+
+/* Add User Form */
+.add-user-form {
+    border-top: 1px solid #ddd;
+    padding-top: 1.5rem;
+}
+
+.add-user-form h3 {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+}
+
+/* Created By */
+.created-by {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 0.5rem;
+    font-style: italic;
+}
+
+/* Login Form */
+#login-form .btn-primary {
+    width: 100%;
+    margin-top: 1rem;
+}

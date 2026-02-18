@@ -10,13 +10,16 @@ const REPO_NAME = 'tokyo2026';
 const REPO_BRANCH = 'master';
 const KML_FOLDER = 'maps';
 
-// Inicializar
-document.addEventListener('DOMContentLoaded', () => {
+// Inicializar app (llamado desde auth.js después de autenticación)
+function initApp() {
     initMap();
     loadFindings();
     loadKMLList();
     setupEventListeners();
-});
+}
+
+// Exportar para usar desde auth.js
+window.initApp = initApp;
 
 // Cargar lista de KMLs desde el repo usando GitHub API
 async function loadKMLList() {
@@ -27,7 +30,9 @@ async function loadKMLList() {
         const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${KML_FOLDER}`;
         console.log('Fetching KML list from:', apiUrl);
         
-        const response = await fetch(apiUrl);
+        const response = await fetch(apiUrl, {
+            headers: getAuthHeaders()
+        });
         
         if (!response.ok) {
             throw new Error(`GitHub API error: ${response.status}`);
@@ -573,9 +578,10 @@ async function processBarcode(barcode) {
 }
 
 async function lookupBarcode(barcode) {
-    // Usar el endpoint local del backend
     try {
-        const response = await fetch(`${API_BASE}/api/lookup-barcode?code=${encodeURIComponent(barcode)}`);
+        const response = await fetch(`${API_BASE}/api/lookup-barcode?code=${encodeURIComponent(barcode)}`, {
+            headers: getAuthHeaders()
+        });
         
         if (!response.ok) return null;
         
@@ -729,7 +735,9 @@ const API_BASE = '';
 
 async function loadFindings() {
     try {
-        const response = await fetch(`${API_BASE}/api/findings`);
+        const response = await fetch(`${API_BASE}/api/findings`, {
+            headers: getAuthHeaders()
+        });
         if (!response.ok) throw new Error('Failed to load findings');
         currentFindings = await response.json();
         renderFindings();
@@ -743,6 +751,7 @@ async function saveFinding(formData) {
     try {
         const response = await fetch(`${API_BASE}/api/findings`, {
             method: 'POST',
+            headers: getAuthHeaders(),
             body: formData
         });
         if (!response.ok) throw new Error('Failed to save');
@@ -758,10 +767,11 @@ async function saveFinding(formData) {
 
 async function deleteFinding(id) {
     if (!confirm('¿Borrar este item?')) return;
-    
+
     try {
         const response = await fetch(`${API_BASE}/api/findings/${id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getAuthHeaders()
         });
         if (!response.ok) throw new Error('Failed to delete');
         currentFindings = currentFindings.filter(f => f.id !== id);
@@ -787,7 +797,8 @@ function renderFindings() {
         const date = new Date(f.createdAt).toLocaleString('es-AR');
         const photoUrl = f.photoUrl || f.photo || '';
         const tags = f.tags || [];
-        
+        const createdBy = f.createdBy || 'Desconocido';
+
         return `
         <div class="finding-card">
             <button class="delete-btn" onclick="deleteFinding('${f.id}')">×</button>
@@ -798,6 +809,7 @@ function renderFindings() {
                 ${f.location ? `<div class="location">📍 ${f.location}</div>` : ''}
                 ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag-item">${t}</span>`).join('')}</div>` : ''}
                 <div class="date">${date}</div>
+                <div class="created-by">👤 ${createdBy}</div>
             </div>
         </div>
     `}).join('');
