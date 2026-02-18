@@ -11,6 +11,21 @@
     <!-- ZXing for barcode scanning -->
     <script src="/zxing-browser.min.js"></script>
     <script src="/barcode-scanner.js"></script>
+    <script src="config.js"></script>
+    <script>
+        // Cargar Google Maps si hay API key configurada
+        window.USE_GOOGLE_MAPS = false;
+        if (typeof CONFIG !== 'undefined' && CONFIG.GOOGLE_MAPS_API_KEY) {
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${CONFIG.GOOGLE_MAPS_API_KEY}&libraries=places`;
+            script.async = true;
+            script.defer = true;
+            script.onload = function() {
+                window.USE_GOOGLE_MAPS = true;
+            };
+            document.head.appendChild(script);
+        }
+    </script>
 </head>
 <body>
     <nav class="navbar">

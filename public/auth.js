@@ -34,12 +34,10 @@ async function login(username, password) {
         
         hideLoginModal();
         showUserInfo();
-        await loadConfig();
         initApp();
         
         return true;
     } catch (err) {
-        console.error('Login error:', err);
         showLoginError(err.message);
         return false;
     }
@@ -64,11 +62,9 @@ async function checkAuth() {
         currentUser = await response.json();
         hideLoginModal();
         showUserInfo();
-        await loadConfig();
         initApp();
         return true;
     } catch (err) {
-        console.error('Auth check failed:', err);
         authToken = null;
         localStorage.removeItem('authToken');
         showLoginModal();
@@ -118,7 +114,6 @@ async function loadUsers() {
         const users = await response.json();
         displayUsers(users);
     } catch (err) {
-        console.error('Error loading users:', err);
         alert('Error cargando usuarios');
     }
 }
@@ -152,7 +147,6 @@ async function createUser(username, password) {
         await loadUsers();
         return true;
     } catch (err) {
-        console.error('Error creating user:', err);
         alert(err.message);
         return false;
     }
@@ -171,7 +165,6 @@ async function deleteUser(userId) {
         
         await loadUsers();
     } catch (err) {
-        console.error('Error deleting user:', err);
         alert('Error eliminando usuario');
     }
 }
@@ -219,59 +212,3 @@ window.currentUser = () => currentUser;
 window.showUsersModal = showUsersModal;
 window.closeUsersModal = closeUsersModal;
 window.deleteUser = deleteUser;
-
-// Config y carga de mapas
-let appConfig = null;
-
-async function loadConfig() {
-    try {
-        const response = await fetch(`${API_BASE}/api/config`, {
-            headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) throw new Error('Failed to load config');
-        
-        appConfig = await response.json();
-        
-        if (appConfig.googleMapsApiKey) {
-            await loadGoogleMaps(appConfig.googleMapsApiKey);
-        } else {
-            loadOpenStreetMap();
-        }
-    } catch (err) {
-        console.error('Error loading config:', err);
-        loadOpenStreetMap();
-    }
-}
-
-function loadGoogleMaps(apiKey) {
-    return new Promise((resolve, reject) => {
-        window.USE_GOOGLE_MAPS = false;
-        
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=onGoogleMapsLoaded`;
-        script.async = true;
-        script.defer = true;
-        
-        window.onGoogleMapsLoaded = function() {
-            window.USE_GOOGLE_MAPS = true;
-            resolve();
-        };
-        
-        script.onerror = function() {
-            console.error('Google Maps failed to load');
-            loadOpenStreetMap();
-            reject();
-        };
-        
-        document.head.appendChild(script);
-    });
-}
-
-function loadOpenStreetMap() {
-    window.USE_GOOGLE_MAPS = false;
-    
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    document.head.appendChild(script);
-}

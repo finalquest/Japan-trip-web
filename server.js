@@ -19,7 +19,6 @@ const DATA_FILE = path.join(__dirname, 'data', 'findings.json');
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
-const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
 // Configuración SSL
 const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
@@ -267,13 +266,6 @@ app.delete('/api/users/:id', authenticateToken, async (req, res) => {
 // Health check (público)
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Configuración del frontend (protegido)
-app.get('/api/config', authenticateToken, (req, res) => {
-    res.json({
-        googleMapsApiKey: GOOGLE_MAPS_API_KEY || null
-    });
 });
 
 // Listar KMLs desde GitHub
