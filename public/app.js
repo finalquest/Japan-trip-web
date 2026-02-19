@@ -748,19 +748,76 @@ async function extractText() {
 }
 
 // Preview de foto y mostrar formulario
-document.getElementById('finding-photo')?.addEventListener('change', (e) => {
+document.getElementById('finding-photo')?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const img = document.getElementById('photo-preview');
-            img.src = e.target.result;
-            
-            // Ocultar cámara, mostrar formulario
-            document.getElementById('camera-step').style.display = 'none';
-            document.getElementById('finding-form').style.display = 'block';
-        };
-        reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Mostrar preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = document.getElementById('photo-preview');
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+
+    // Ocultar cámara, mostrar formulario inmediatamente
+    document.getElementById('camera-step').style.display = 'none';
+    document.getElementById('finding-form').style.display = 'block';
+
+    // Procesar imagen con OCR para extraer datos automáticamente
+    showNotification('🔍 Analizando imagen...');
+
+    try {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const response = await fetch(`${API_BASE}/api/extract-text`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: formData
+        });
+
+        if (!response.ok) {
+            console.log('OCR no disponible o error, continuando sin autofill');
+            return;
+        }
+
+        const data = await response.json();
+
+        if (data.data) {
+            const extracted = data.data;
+
+            // Pre-llenar título
+            if (extracted.productName) {
+                document.getElementById('finding-title').value = extracted.productName;
+            }
+
+            // Pre-llenar precio
+            if (extracted.price) {
+                document.getElementById('finding-price').value = extracted.price;
+            }
+
+            // Construir notas con la información extraída
+            const notes = [];
+            if (extracted.brand) notes.push(`🏭 Marca: ${extracted.brand}`);
+            if (extracted.model) notes.push(`🔢 Modelo: ${extracted.model}`);
+            if (extracted.condition) notes.push(`📋 Estado: ${extracted.condition}`);
+            if (extracted.warranty) notes.push(`🛡️ Garantía: ${extracted.warranty}`);
+            if (extracted.features && Array.isArray(extracted.features) && extracted.features.length > 0) {
+                notes.push('✨ Características:');
+                extracted.features.forEach(f => notes.push(`  • ${f}`));
+            }
+
+            // Llenar descripción con notas
+            if (notes.length > 0) {
+                document.getElementById('finding-desc').value = notes.join('\n');
+            }
+
+            showNotification('✅ Datos extraídos de la imagen');
+        }
+    } catch (err) {
+        console.error('Error procesando imagen:', err);
+        // No mostrar error al usuario, solo continuar sin autofill
     }
 });
 
