@@ -10,6 +10,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const OpenAI = require('openai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,6 +21,12 @@ const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY;
+
+// Cliente OpenAI configurado para Moonshot
+const moonshotClient = MOONSHOT_API_KEY ? new OpenAI({
+    apiKey: MOONSHOT_API_KEY,
+    baseURL: 'https://api.moonshot.ai/v1'
+}) : null;
 
 // Configuración SSL
 const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
@@ -359,12 +366,13 @@ app.get('/api/findings', authenticateToken, async (req, res) => {
 // Crear un hallazgo
 app.post('/api/findings', authenticateToken, upload.single('photo'), async (req, res) => {
     try {
-        const { title, description, location, lat, lng, tags } = req.body;
-        
+        const { title, description, price, location, lat, lng, tags } = req.body;
+
         const finding = {
             id: uuidv4(),
             title,
             description,
+            price: price || null,
             location,
             lat: lat ? parseFloat(lat) : null,
             lng: lng ? parseFloat(lng) : null,
@@ -417,6 +425,29 @@ app.delete('/api/findings/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Función para formatear datos extraídos en texto legible
+function formatExtractedData(data) {
+    const lines = [];
+    
+    if (data.productName) lines.push(`📦 Producto: ${data.productName}`);
+    if (data.brand) lines.push(`🏭 Marca: ${data.brand}`);
+    if (data.model) lines.push(`🔢 Modelo: ${data.model}`);
+    if (data.price) lines.push(`💰 Precio: ${data.price}`);
+    if (data.condition) lines.push(`📋 Estado: ${data.condition}`);
+    if (data.warranty) lines.push(`🛡️ Garantía: ${data.warranty}`);
+    
+    if (data.features && Array.isArray(data.features) && data.features.length > 0) {
+        lines.push(`✨ Características:`);
+        data.features.forEach(feature => lines.push(`  • ${feature}`));
+    }
+    
+    if (data.rawTranslation && lines.length === 0) {
+        lines.push(data.rawTranslation);
+    }
+    
+    return lines.join('\n');
+}
+
 // Extraer texto de imagen usando Moonshot OCR
 app.post('/api/extract-text', authenticateToken, uploadMemory.single('image'), async (req, res) => {
     try {
@@ -424,7 +455,7 @@ app.post('/api/extract-text', authenticateToken, uploadMemory.single('image'), a
             return res.status(400).json({ error: 'No image provided' });
         }
 
-        if (!MOONSHOT_API_KEY) {
+        if (!moonshotClient) {
             return res.status(500).json({ error: 'Moonshot API key not configured' });
         }
 
@@ -432,44 +463,74 @@ app.post('/api/extract-text', authenticateToken, uploadMemory.single('image'), a
         const base64Image = req.file.buffer.toString('base64');
         const mimeType = req.file.mimetype;
 
-        // Llamar a Moonshot API
-        const response = await axios.post('https://api.moonshot.cn/v1/chat/completions', {
-            model: 'moonshot-v1-8k',
+        // Llamar a Moonshot API usando OpenAI SDK
+        const completion = await moonshotClient.chat.completions.create({
+            model: 'moonshot-v1-8k-vision-preview',
             messages: [
+                {
+                    role: 'system',
+                    content: `Eres un asistente que extrae información de etiquetas de productos japonesas y la devuelve en formato JSON estructurado.
+                    Analiza la imagen y extrae la información traduciendo TODO al español:
+                    - productName: nombre del producto traducido al español
+                    - price: precio (con símbolo ¥ si está presente)
+                    - brand: marca/fabricante
+                    - model: modelo/número de modelo
+                    - condition: estado/condición traducido (nuevo, usado, reacondicionado, etc.)
+                    - warranty: período de garantía traducido
+                    - features: características principales traducidas al español (array)
+                    
+                    IMPORTANTE: Todos los valores deben estar en español, excepto números de modelo y precios.
+                    Responde SOLO con un JSON válido, sin texto adicional.`
+                },
                 {
                     role: 'user',
                     content: [
-                        {
-                            type: 'text',
-                            text: 'Extrae el texto japonés de esta imagen y traducelo al español. Responde solo con la traducción, sin comentarios adicionales.'
-                        },
                         {
                             type: 'image_url',
                             image_url: {
                                 url: `data:${mimeType};base64,${base64Image}`
                             }
+                        },
+                        {
+                            type: 'text',
+                            text: 'Extrae la información de esta etiqueta de producto japonés y devuélvela en formato JSON estructurado.'
                         }
                     ]
                 }
             ],
-            temperature: 0.3
-        }, {
-            headers: {
-                'Authorization': `Bearer ${MOONSHOT_API_KEY}`,
-                'Content-Type': 'application/json'
-            }
+            temperature: 0.3,
+            max_completion_tokens: 2048,
+            response_format: { type: 'json_object' }
         });
 
-        const translatedText = response.data.choices[0]?.message?.content?.trim();
+        const responseContent = completion.choices[0]?.message?.content?.trim();
         
-        if (!translatedText) {
+        if (!responseContent) {
             return res.status(500).json({ error: 'No text extracted' });
         }
 
-        res.json({ translatedText });
+        // Parsear el JSON de la respuesta
+        let extractedData;
+        try {
+            extractedData = JSON.parse(responseContent);
+        } catch (parseErr) {
+            console.error('Error parsing JSON response:', parseErr);
+            // Si no es JSON válido, devolver el texto crudo
+            extractedData = { rawTranslation: responseContent };
+        }
+
+        res.json({ 
+            success: true,
+            data: extractedData,
+            // También devolver un texto formateado para mostrar en el textarea
+            formattedText: formatExtractedData(extractedData)
+        });
     } catch (err) {
         console.error('Error extracting text:', err.message);
-        res.status(500).json({ error: 'Failed to extract text from image' });
+        if (err.error) {
+            console.error('Moonshot API error:', err.error);
+        }
+        res.status(500).json({ error: 'Failed to extract text from image', details: err.message });
     }
 });
 

@@ -484,32 +484,43 @@ function getCurrentLocation() {
 
 // Funciones para escanear código de barras
 async function startBarcodeScan() {
+    console.log('[APP] startBarcodeScan iniciado');
     const video = document.getElementById('barcode-video');
     const cameraStep = document.getElementById('camera-step');
     const barcodeStep = document.getElementById('barcode-step');
     
+    console.log('[APP] video element:', video);
+    console.log('[APP] cameraStep:', cameraStep);
+    console.log('[APP] barcodeStep:', barcodeStep);
+    console.log('[APP] window.BarcodeScanner:', typeof window.BarcodeScanner);
+    
     if (!window.BarcodeScanner) {
+        console.error('[APP] ERROR: BarcodeScanner no está disponible');
         alert('Error: El escáner no está disponible. Recargá la página.');
         return;
     }
     
+    console.log('[APP] Ocultando cameraStep, mostrando barcodeStep');
     cameraStep.style.display = 'none';
     barcodeStep.style.display = 'block';
     
     barcodeScanning = true;
     
+    console.log('[APP] Llamando a BarcodeScanner.start...');
     try {
         await window.BarcodeScanner.start(
             video,
             (barcode) => {
+                console.log('[APP] Barcode detectado en callback:', barcode);
                 processBarcode(barcode);
             },
             (errorMsg) => {
-                console.error('Scanner error:', errorMsg);
+                console.error('[APP] Scanner error:', errorMsg);
             }
         );
+        console.log('[APP] BarcodeScanner.start completado');
     } catch (err) {
-        console.error('Error starting scanner:', err);
+        console.error('[APP] Error starting scanner:', err);
         showManualBarcodeInput();
     }
 }
@@ -644,6 +655,7 @@ async function extractText() {
     const loadingDiv = document.getElementById('ocr-loading');
     const extractBtn = document.getElementById('extract-btn');
     const descTextarea = document.getElementById('finding-desc');
+    const priceInput = document.getElementById('finding-price');
     
     if (!fileInput.files || fileInput.files.length === 0) {
         alert('Seleccioná una imagen primero');
@@ -678,14 +690,43 @@ async function extractText() {
         }
         
         const data = await response.json();
-        const translatedText = data.translatedText;
         
-        // Appendear al textarea de descripción
-        const currentText = descTextarea.value;
-        if (currentText) {
-            descTextarea.value = currentText + '\n\n' + translatedText;
-        } else {
-            descTextarea.value = translatedText;
+        // Procesar datos extraídos
+        if (data.data) {
+            const extracted = data.data;
+            
+            // Actualizar título si está vacío
+            const titleInput = document.getElementById('finding-title');
+            if (extracted.productName && !titleInput.value) {
+                titleInput.value = extracted.productName;
+            }
+            
+            // Actualizar precio si está vacío
+            if (extracted.price && !priceInput.value) {
+                priceInput.value = extracted.price;
+            }
+            
+            // Construir notas con el resto de la información
+            const notes = [];
+            if (extracted.brand) notes.push(`🏭 Marca: ${extracted.brand}`);
+            if (extracted.model) notes.push(`🔢 Modelo: ${extracted.model}`);
+            if (extracted.condition) notes.push(`📋 Estado: ${extracted.condition}`);
+            if (extracted.warranty) notes.push(`🛡️ Garantía: ${extracted.warranty}`);
+            if (extracted.features && Array.isArray(extracted.features) && extracted.features.length > 0) {
+                notes.push('✨ Características:');
+                extracted.features.forEach(f => notes.push(`  • ${f}`));
+            }
+            
+            // Appendear notas a la descripción
+            if (notes.length > 0) {
+                const notesText = notes.join('\n');
+                const currentText = descTextarea.value;
+                if (currentText) {
+                    descTextarea.value = currentText + '\n\n' + notesText;
+                } else {
+                    descTextarea.value = notesText;
+                }
+            }
         }
         
         // Limpiar input
@@ -739,6 +780,7 @@ document.getElementById('finding-form')?.addEventListener('submit', async (e) =>
     const photoInput = document.getElementById('finding-photo');
     const title = document.getElementById('finding-title').value;
     const desc = document.getElementById('finding-desc').value;
+    const price = document.getElementById('finding-price').value;
     const location = document.getElementById('finding-location').value;
     const lat = document.getElementById('finding-lat').value;
     const lng = document.getElementById('finding-lng').value;
@@ -750,6 +792,7 @@ document.getElementById('finding-form')?.addEventListener('submit', async (e) =>
     }
     formData.append('title', title);
     formData.append('description', desc);
+    formData.append('price', price);
     formData.append('location', location);
     formData.append('lat', lat);
     formData.append('lng', lng);
@@ -848,6 +891,7 @@ function renderFindings() {
             ${photoUrl ? `<img src="${photoUrl}" alt="${f.title}">` : ''}
             <div class="finding-card-content">
                 <h3>${f.title}</h3>
+                ${f.price ? `<div class="price">${f.price}</div>` : ''}
                 <p>${f.description || 'Sin descripción'}</p>
                 ${f.location ? `<div class="location">📍 ${f.location}</div>` : ''}
                 ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag-item">${t}</span>`).join('')}</div>` : ''}

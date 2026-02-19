@@ -408,6 +408,21 @@ main {
     cursor: pointer;
 }
 
+/* Price field styling */
+.price-field input {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #1a73e8;
+    background: #f0f7ff;
+    border: 2px solid #1a73e8;
+}
+
+.price-field input:focus {
+    outline: none;
+    border-color: #1557b0;
+    box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
+}
+
 .tags-input {
     display: flex;
     flex-wrap: wrap;
@@ -486,6 +501,17 @@ main {
 .finding-card h3 {
     margin-bottom: 0.5rem;
     font-size: 1.1rem;
+}
+
+.finding-card .price {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1a73e8;
+    background: #f0f7ff;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 0.5rem;
 }
 
 .finding-card p {
