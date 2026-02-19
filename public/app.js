@@ -156,7 +156,18 @@ function showTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     
-    document.getElementById(tabName === 'map' ? 'map-section' : 'findings-section').classList.add('active');
+    // Mapear nombres de tabs a IDs de secciones
+    const sectionMap = {
+        'map': 'map-section',
+        'add-finding': 'add-finding-section',
+        'findings-list': 'findings-list-section'
+    };
+    
+    const sectionId = sectionMap[tabName];
+    if (sectionId) {
+        document.getElementById(sectionId).classList.add('active');
+    }
+    
     event.target.classList.add('active');
     
     if (tabName === 'map' && map) {
@@ -165,6 +176,19 @@ function showTab(tabName) {
         } else if (mapType === 'leaflet') {
             map.invalidateSize();
         }
+    }
+    
+    // Si estamos en la pestaña de mapa de hallazgos, actualizar el tamaño del mapa
+    if (tabName === 'findings-list' && currentView === 'map') {
+        setTimeout(() => {
+            if (findingsMap) {
+                if (window.google && findingsMap.setZoom) {
+                    google.maps.event.trigger(findingsMap, 'resize');
+                } else if (window.L && findingsMap.invalidateSize) {
+                    findingsMap.invalidateSize();
+                }
+            }
+        }, 100);
     }
 }
 

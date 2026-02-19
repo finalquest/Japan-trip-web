@@ -34,7 +34,8 @@
         <h1>🇯🇵 Japan Trip Planner</h1>
         <div class="nav-tabs">
             <button class="tab-btn active" onclick="showTab('map')">🗺️ Itinerario (KML)</button>
-            <button class="tab-btn" onclick="showTab('findings')">📸 Encontré Esto</button>
+            <button class="tab-btn" onclick="showTab('add-finding')">➕ Agregar</button>
+            <button class="tab-btn" onclick="showTab('findings-list')">📋 Mis Hallazgos</button>
             <button class="tab-btn" onclick="showUsersModal()" id="users-btn" style="display: none;">⚙️ Usuarios</button>
         </div>
         <div class="user-info" id="user-info" style="display: none;">
@@ -76,8 +77,8 @@
             <div id="route-info"></div>
         </section>
 
-        <!-- Sección Encontré Esto -->
-        <section id="findings-section" class="tab-content">
+        <!-- Sección Agregar Hallazgo -->
+        <section id="add-finding-section" class="tab-content">
             <div class="add-finding">
                 <h2>📸 Encontré algo interesante</h2>
                 
@@ -162,10 +163,13 @@
                     <button type="submit" class="btn-primary">💾 Guardar</button>
                 </form>
             </div>
-            
-            <div class="findings-list">
+        </section>
+
+        <!-- Sección Mis Hallazgos -->
+        <section id="findings-list-section" class="tab-content">
+            <div class="findings-list-container">
                 <div class="findings-header">
-                    <h2>Mis descubrimientos (<span id="findings-count">0</span>)</h2>
+                    <h2>📋 Mis descubrimientos (<span id="findings-count">0</span>)</h2>
                     <div class="view-toggle">
                         <button type="button" id="btn-list-view" class="btn-view active" onclick="switchToListView()">
                             📋 Lista

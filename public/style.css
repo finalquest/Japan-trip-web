@@ -449,18 +449,28 @@ main {
     background: #1557b0;
 }
 
-/* Lista de hallazgos */
+/* Sección Mis Hallazgos */
+.findings-list-container {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
 .findings-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
     flex-wrap: wrap;
     gap: 0.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f0f0f0;
 }
 
 .findings-header h2 {
     margin: 0;
+    color: #1a73e8;
 }
 
 .view-toggle {
