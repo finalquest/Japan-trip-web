@@ -124,7 +124,14 @@
                         <label>Descripción / Notas:</label>
                         <textarea id="finding-desc" placeholder="Precio, tienda, por qué no lo compraste, etc."></textarea>
                     </div>
-                    
+
+                    <div class="form-group ocr-section">
+                        <label>📷 Imagen con texto japonés:</label>
+                        <input type="file" id="ocr-image" accept="image/*" capture="environment">
+                        <button type="button" onclick="extractText()" id="extract-btn">Extraer y traducir</button>
+                        <div id="ocr-loading" class="loading-indicator" style="display: none;">⏳ Procesando imagen...</div>
+                    </div>
+
                     <div class="form-group">
                         <label>Tienda / Ubicación:</label>
                         <input type="text" id="finding-location" placeholder="Ej: Surugaya Akihabara">

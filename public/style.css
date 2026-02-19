@@ -689,3 +689,52 @@ main {
     width: 100%;
     margin-top: 1rem;
 }
+
+/* OCR Section */
+.ocr-section {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 2px dashed #ddd;
+}
+
+.ocr-section label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #666;
+}
+
+#ocr-image {
+    margin-bottom: 0.75rem;
+}
+
+#extract-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    margin-top: 0.5rem;
+    transition: background 0.2s;
+}
+
+#extract-btn:hover {
+    background: #218838;
+}
+
+#extract-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+.loading-indicator {
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: #fff3cd;
+    border-radius: 4px;
+    color: #856404;
+    font-size: 0.9rem;
+}

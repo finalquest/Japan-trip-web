@@ -19,6 +19,7 @@ const DATA_FILE = path.join(__dirname, 'data', 'findings.json');
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
+const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY;
 
 // Configuración SSL
 const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
@@ -124,6 +125,9 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+
+// Multer para OCR (sin guardar archivo)
+const uploadMemory = multer({ storage: multer.memoryStorage() });
 
 // ==================== AUTH ROUTES ====================
 
@@ -413,6 +417,62 @@ app.delete('/api/findings/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Extraer texto de imagen usando Moonshot OCR
+app.post('/api/extract-text', authenticateToken, uploadMemory.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image provided' });
+        }
+
+        if (!MOONSHOT_API_KEY) {
+            return res.status(500).json({ error: 'Moonshot API key not configured' });
+        }
+
+        // Convertir imagen a base64
+        const base64Image = req.file.buffer.toString('base64');
+        const mimeType = req.file.mimetype;
+
+        // Llamar a Moonshot API
+        const response = await axios.post('https://api.moonshot.cn/v1/chat/completions', {
+            model: 'moonshot-v1-8k',
+            messages: [
+                {
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'Extrae el texto japonés de esta imagen y traducelo al español. Responde solo con la traducción, sin comentarios adicionales.'
+                        },
+                        {
+                            type: 'image_url',
+                            image_url: {
+                                url: `data:${mimeType};base64,${base64Image}`
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature: 0.3
+        }, {
+            headers: {
+                'Authorization': `Bearer ${MOONSHOT_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const translatedText = response.data.choices[0]?.message?.content?.trim();
+        
+        if (!translatedText) {
+            return res.status(500).json({ error: 'No text extracted' });
+        }
+
+        res.json({ translatedText });
+    } catch (err) {
+        console.error('Error extracting text:', err.message);
+        res.status(500).json({ error: 'Failed to extract text from image' });
+    }
+});
+
 // Iniciar servidor
 async function start() {
     await ensureDataDir();
@@ -455,6 +515,7 @@ async function start() {
     console.log(`  GET  /api/findings`);
     console.log(`  POST /api/findings`);
     console.log(`  DELETE /api/findings/:id`);
+    console.log(`  POST /api/extract-text`);
 }
 
 start();

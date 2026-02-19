@@ -638,6 +638,67 @@ function cancelBarcodeScan() {
     document.getElementById('camera-step').style.display = 'block';
 }
 
+// Extraer texto de imagen usando OCR
+async function extractText() {
+    const fileInput = document.getElementById('ocr-image');
+    const loadingDiv = document.getElementById('ocr-loading');
+    const extractBtn = document.getElementById('extract-btn');
+    const descTextarea = document.getElementById('finding-desc');
+    
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Seleccioná una imagen primero');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    
+    // Validar que sea imagen
+    if (!file.type.startsWith('image/')) {
+        alert('El archivo debe ser una imagen');
+        return;
+    }
+    
+    // Mostrar loading
+    loadingDiv.style.display = 'block';
+    extractBtn.disabled = true;
+    
+    try {
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        const response = await fetch(`${API_BASE}/api/extract-text`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al procesar imagen');
+        }
+        
+        const data = await response.json();
+        const translatedText = data.translatedText;
+        
+        // Appendear al textarea de descripción
+        const currentText = descTextarea.value;
+        if (currentText) {
+            descTextarea.value = currentText + '\n\n' + translatedText;
+        } else {
+            descTextarea.value = translatedText;
+        }
+        
+        // Limpiar input
+        fileInput.value = '';
+        
+    } catch (err) {
+        alert('Error: ' + err.message);
+    } finally {
+        loadingDiv.style.display = 'none';
+        extractBtn.disabled = false;
+    }
+}
+
 // Preview de foto y mostrar formulario
 document.getElementById('finding-photo')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -808,6 +869,7 @@ window.retakePhoto = retakePhoto;
 window.startBarcodeScan = startBarcodeScan;
 window.cancelBarcodeScan = cancelBarcodeScan;
 window.submitManualBarcode = submitManualBarcode;
+window.extractText = extractText;
 
 function setupEventListeners() {
     // Cualquier setup adicional
