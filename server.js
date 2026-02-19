@@ -366,13 +366,14 @@ app.get('/api/findings', authenticateToken, async (req, res) => {
 // Crear un hallazgo
 app.post('/api/findings', authenticateToken, upload.single('photo'), async (req, res) => {
     try {
-        const { title, description, price, location, lat, lng, tags } = req.body;
+        const { title, description, price, barcode, location, lat, lng, tags } = req.body;
 
         const finding = {
             id: uuidv4(),
             title,
             description,
             price: price || null,
+            barcode: barcode || null,
             location,
             lat: lat ? parseFloat(lat) : null,
             lng: lng ? parseFloat(lng) : null,

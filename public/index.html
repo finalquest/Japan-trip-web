@@ -101,8 +101,9 @@
                 
                 <!-- Paso 1b: Escanear barcode -->
                 <div id="barcode-step" class="barcode-scanner" style="display: none;">
+                    <p style="color: #666; margin-bottom: 0.5rem; font-size: 0.9rem;">📱 Acercá el código de barras a la cámara</p>
                     <div id="barcode-video-container">
-                        <video id="barcode-video" playsinline></video>
+                        <video id="barcode-video" playsinline autoplay muted></video>
                         <div class="scan-line"></div>
                     </div>
                     <button type="button" class="btn-cancel" onclick="cancelBarcodeScan()">❌ Cancelar</button>
@@ -124,6 +125,8 @@
                         <label>💰 Precio:</label>
                         <input type="text" id="finding-price" placeholder="Ej: ¥6,600">
                     </div>
+
+                    <input type="hidden" id="finding-barcode">
 
                     <div class="form-group">
                         <label>Descripción / Notas:</label>
@@ -169,6 +172,29 @@
             </div>
         </section>
     </main>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="modal" style="display: none;">
+        <div class="modal-content detail-modal-content">
+            <div class="detail-header">
+                <h2 id="detail-title">Detalle del Producto</h2>
+                <button onclick="closeDetailModal()" class="btn-close">✕</button>
+            </div>
+            <div class="detail-body">
+                <div id="detail-photo-container" style="position: relative;"></div>
+                <div class="detail-info">
+                    <div id="detail-price" class="detail-price"></div>
+                    <div id="detail-description"></div>
+                    <div id="detail-location"></div>
+                    <div id="detail-tags"></div>
+                    <div id="detail-meta"></div>
+                </div>
+            </div>
+            <div class="detail-actions">
+                <button onclick="closeDetailModal()" class="btn-primary">Cerrar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Login Modal -->
     <div id="login-modal" class="modal" style="display: flex;">

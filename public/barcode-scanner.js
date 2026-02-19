@@ -78,10 +78,29 @@
                 console.log('[BARCODE] Constraints:', constraints);
 
                 console.log('[BARCODE] Iniciando decodeFromConstraints...');
+                console.log('[BARCODE] Video paused:', videoElement.paused);
+                console.log('[BARCODE] Video readyState:', videoElement.readyState);
+                
+                // Asegurar que el video esté reproduciendo
+                videoElement.play().then(() => {
+                    console.log('[BARCODE] Video reproduciendo');
+                }).catch(e => {
+                    console.error('[BARCODE] Error reproduciendo video:', e);
+                });
+                
+                let frameCount = 0;
+                let lastLogTime = Date.now();
+                
                 this._controls = await this._reader.decodeFromConstraints(
                     constraints,
                     videoElement,
                     (result, err) => {
+                        frameCount++;
+                        const now = Date.now();
+                        if (now - lastLogTime > 2000) {
+                            console.log('[BARCODE] Frames procesados:', frameCount, 'Video playing:', !videoElement.paused);
+                            lastLogTime = now;
+                        }
                         if (result) {
                             console.log('[BARCODE] ¡CÓDIGO DETECTADO!', result.getText());
                             onDetected(result.getText());
@@ -92,7 +111,7 @@
                                 // Ignorar, es normal
                                 return;
                             }
-                            console.error('[BARCODE] Error en scan:', err.message);
+                            console.error('[BARCODE] Error en scan:', err.name, err.message);
                             if (onError) onError(err.message);
                         }
                     },

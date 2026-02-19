@@ -525,7 +525,14 @@ async function startBarcodeScan() {
     }
 }
 
+// Variable global para guardar el barcode actual
+let currentBarcode = null;
+
 async function processBarcode(barcode) {
+    // Guardar barcode globalmente
+    currentBarcode = barcode;
+    document.getElementById('finding-barcode').value = barcode;
+    
     // Detener escaneo
     barcodeScanning = false;
     
@@ -781,6 +788,7 @@ document.getElementById('finding-form')?.addEventListener('submit', async (e) =>
     const title = document.getElementById('finding-title').value;
     const desc = document.getElementById('finding-desc').value;
     const price = document.getElementById('finding-price').value;
+    const barcode = document.getElementById('finding-barcode').value;
     const location = document.getElementById('finding-location').value;
     const lat = document.getElementById('finding-lat').value;
     const lng = document.getElementById('finding-lng').value;
@@ -793,6 +801,7 @@ document.getElementById('finding-form')?.addEventListener('submit', async (e) =>
     formData.append('title', title);
     formData.append('description', desc);
     formData.append('price', price);
+    formData.append('barcode', barcode);
     formData.append('location', location);
     formData.append('lat', lat);
     formData.append('lng', lng);
@@ -886,20 +895,205 @@ function renderFindings() {
         const createdBy = f.createdBy || 'Desconocido';
 
         return `
-        <div class="finding-card">
-            <button class="delete-btn" onclick="deleteFinding('${f.id}')">×</button>
+        <div class="finding-card" onclick="showDetailModal('${f.id}')" style="cursor: pointer;">
+            <button class="delete-btn" onclick="event.stopPropagation(); deleteFinding('${f.id}')">×</button>
             ${photoUrl ? `<img src="${photoUrl}" alt="${f.title}">` : ''}
             <div class="finding-card-content">
                 <h3>${f.title}</h3>
                 ${f.price ? `<div class="price">${f.price}</div>` : ''}
-                <p>${f.description || 'Sin descripción'}</p>
+                <p>${f.description ? f.description.substring(0, 100) + (f.description.length > 100 ? '...' : '') : 'Sin descripción'}</p>
                 ${f.location ? `<div class="location">📍 ${f.location}</div>` : ''}
-                ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag-item">${t}</span>`).join('')}</div>` : ''}
+                ${tags.length ? `<div class="tags">${tags.slice(0, 3).map(t => `<span class="tag-item">${t}</span>`).join('')}${tags.length > 3 ? '<span class="tag-item">+' + (tags.length - 3) + '</span>' : ''}</div>` : ''}
                 <div class="date">${date}</div>
                 <div class="created-by">👤 ${createdBy}</div>
             </div>
         </div>
     `}).join('');
+}
+
+// Variable global para el finding actual en detalle
+let currentDetailFinding = null;
+
+// Mostrar modal de detalle
+async function showDetailModal(findingId) {
+    const finding = currentFindings.find(f => f.id === findingId);
+    if (!finding) return;
+    
+    currentDetailFinding = finding;
+    
+    // Mostrar modal inmediatamente con datos locales
+    renderDetailContent(finding);
+    document.getElementById('detail-modal').style.display = 'flex';
+    
+    // Si tiene barcode, cargar datos actualizados
+    if (finding.barcode) {
+        await loadBarcodeData(finding);
+    }
+}
+
+// Renderizar contenido del detalle
+function renderDetailContent(finding) {
+    // Título
+    document.getElementById('detail-title').textContent = finding.title || 'Detalle del Producto';
+    
+    // Foto
+    const photoContainer = document.getElementById('detail-photo-container');
+    if (finding.photoUrl || finding.photo) {
+        photoContainer.innerHTML = `<img src="${finding.photoUrl || finding.photo}" alt="${finding.title}">`;
+    } else {
+        photoContainer.innerHTML = '<p style="color: #999; padding: 2rem;">Sin foto</p>';
+    }
+    
+    // Precio
+    const priceEl = document.getElementById('detail-price');
+    if (finding.price) {
+        priceEl.textContent = finding.price;
+        priceEl.style.display = 'inline-block';
+    } else {
+        priceEl.style.display = 'none';
+    }
+    
+    // Descripción
+    document.getElementById('detail-description').textContent = finding.description || 'Sin descripción';
+    
+    // Ubicación
+    const locationEl = document.getElementById('detail-location');
+    if (finding.location) {
+        locationEl.innerHTML = `📍 ${finding.location}`;
+        locationEl.style.display = 'block';
+    } else {
+        locationEl.style.display = 'none';
+    }
+    
+    // Tags
+    const tagsEl = document.getElementById('detail-tags');
+    if (finding.tags && finding.tags.length > 0) {
+        tagsEl.innerHTML = finding.tags.map(t => `<span class="tag-item">${t}</span>`).join('');
+    } else {
+        tagsEl.innerHTML = '';
+    }
+    
+    // Meta (fecha, creador y barcode)
+    const date = new Date(finding.createdAt).toLocaleString('es-AR');
+    document.getElementById('detail-meta').innerHTML = `
+        <div>📅 ${date}</div>
+        <div>👤 ${finding.createdBy || 'Desconocido'}</div>
+        ${finding.barcode ? `<div style="margin-top: 0.5rem; font-family: monospace; color: #666;">Barcode: ${finding.barcode}</div>` : ''}
+    `;
+}
+
+// Cargar datos desde barcode
+async function loadBarcodeData(finding) {
+    const photoContainer = document.getElementById('detail-photo-container');
+    
+    // Mostrar loading
+    photoContainer.innerHTML += '<div id="detail-loading" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.9); padding: 1rem; border-radius: 8px;">⏳ Cargando...</div>';
+    
+    try {
+        const product = await lookupBarcode(finding.barcode);
+        
+        if (product) {
+            // Actualizar el finding con datos nuevos
+            finding.title = product.name || finding.title;
+            finding.description = product.description || finding.description;
+            if (product.image) {
+                finding.photoUrl = product.image;
+            }
+            
+            // Re-renderizar con datos actualizados
+            renderDetailContent(finding);
+        }
+    } catch (error) {
+        console.error('Error cargando datos del barcode:', error);
+    } finally {
+        // Quitar loading
+        const loading = document.getElementById('detail-loading');
+        if (loading) loading.remove();
+    }
+}
+
+// Cerrar modal de detalle
+function closeDetailModal() {
+    document.getElementById('detail-modal').style.display = 'none';
+    currentDetailFinding = null;
+}
+
+// Actualizar datos del producto desde barcode
+async function refreshProductData(barcode, findingId) {
+    if (!confirm('¿Actualizar datos del producto desde la base de datos?\n\nEsto reemplazará el título y descripción actuales.')) return;
+    
+    const refreshBtn = document.getElementById('detail-refresh-btn');
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = '⏳ Actualizando...';
+    
+    try {
+        const product = await lookupBarcode(barcode);
+        
+        if (product) {
+            // Actualizar en el array
+            const finding = currentFindings.find(f => f.id === findingId);
+            if (finding) {
+                finding.title = product.name || finding.title;
+                finding.description = product.description || finding.description;
+                if (product.image && !finding.photoUrl) {
+                    finding.photoUrl = product.image;
+                }
+                
+                // Actualizar la vista
+                showDetailModal(findingId);
+                renderFindings();
+                showNotification('✅ Datos actualizados');
+            }
+        } else {
+            showNotification('⚠️ Producto no encontrado en la base de datos');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('❌ Error al consultar producto');
+    } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '🔄 Actualizar datos desde barcode';
+    }
+}
+
+// Re-consultar producto por barcode
+async function relookupProduct(barcode, findingId) {
+    if (!confirm('¿Actualizar datos del producto desde la base de datos?')) return;
+    
+    showNotification(`🔍 Buscando: ${barcode}...`);
+    
+    try {
+        const product = await lookupBarcode(barcode);
+        
+        if (product) {
+            // Actualizar el finding en memoria
+            const finding = currentFindings.find(f => f.id === findingId);
+            if (finding) {
+                finding.title = product.name || finding.title;
+                finding.description = product.description || finding.description;
+                if (product.image && !finding.photoUrl) {
+                    finding.photoUrl = product.image;
+                }
+                
+                // Guardar cambios
+                await saveFindingsToServer(currentFindings);
+                renderFindings();
+                showNotification('✅ Producto actualizado');
+            }
+        } else {
+            showNotification('⚠️ Producto no encontrado en la base de datos');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('❌ Error al consultar producto');
+    }
+}
+
+// Función auxiliar para guardar findings (simulada, debería llamar al backend)
+async function saveFindingsToServer(findings) {
+    // En una implementación real, esto debería hacer un PUT/POST al servidor
+    // Por ahora solo actualizamos en memoria
+    console.log('Findings actualizados:', findings);
 }
 
 // Hacer funciones disponibles globalmente para onclick
@@ -914,6 +1108,10 @@ window.startBarcodeScan = startBarcodeScan;
 window.cancelBarcodeScan = cancelBarcodeScan;
 window.submitManualBarcode = submitManualBarcode;
 window.extractText = extractText;
+window.showDetailModal = showDetailModal;
+window.closeDetailModal = closeDetailModal;
+window.renderDetailContent = renderDetailContent;
+window.loadBarcodeData = loadBarcodeData;
 
 function setupEventListeners() {
     // Cualquier setup adicional
