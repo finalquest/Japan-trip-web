@@ -466,20 +466,40 @@ function updateTagsInput() {
 }
 
 // Geolocalización
-function getCurrentLocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                document.getElementById('finding-lat').value = position.coords.latitude;
-                document.getElementById('finding-lng').value = position.coords.longitude;
-                document.getElementById('finding-location').value = `GPS: ${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`;
-                alert('Ubicación guardada!');
-            },
-            () => alert('No se pudo obtener la ubicación')
-        );
-    } else {
+async function getCurrentLocation() {
+    if (!navigator.geolocation) {
         alert('Geolocalización no soportada');
+        return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            // Guardar coordenadas
+            document.getElementById('finding-lat').value = lat;
+            document.getElementById('finding-lng').value = lng;
+            
+            showNotification('📍 Obteniendo ubicación...');
+            
+            // Intentar obtener nombre del lugar con reverse geocoding
+            const place = await reverseGeocode(lat, lng);
+            
+            if (place) {
+                document.getElementById('finding-location').value = place.name;
+                document.getElementById('finding-place-id').value = place.place_id;
+                document.getElementById('finding-place-name').value = place.name;
+                document.getElementById('finding-place-address').value = place.formatted_address;
+                showNotification(`✅ Ubicación: ${place.name}`);
+            } else {
+                // Fallback a coordenadas si no encuentra lugar
+                document.getElementById('finding-location').value = `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                showNotification('✅ Ubicación guardada (coordenadas)');
+            }
+        },
+        () => alert('No se pudo obtener la ubicación')
+    );
 }
 
 // Funciones para escanear código de barras
@@ -851,6 +871,11 @@ document.getElementById('finding-form')?.addEventListener('submit', async (e) =>
     const lng = document.getElementById('finding-lng').value;
     const tags = document.getElementById('finding-tags').value;
     
+    // Obtener datos de ubicación estructurados
+    const placeId = document.getElementById('finding-place-id').value;
+    const placeName = document.getElementById('finding-place-name').value;
+    const placeAddress = document.getElementById('finding-place-address').value;
+    
     const formData = new FormData();
     if (photoInput.files && photoInput.files[0]) {
         formData.append('photo', photoInput.files[0]);
@@ -860,6 +885,9 @@ document.getElementById('finding-form')?.addEventListener('submit', async (e) =>
     formData.append('price', price);
     formData.append('barcode', barcode);
     formData.append('location', location);
+    formData.append('placeId', placeId);
+    formData.append('placeName', placeName);
+    formData.append('placeAddress', placeAddress);
     formData.append('lat', lat);
     formData.append('lng', lng);
     formData.append('tags', tags);
@@ -951,6 +979,14 @@ function renderFindings() {
         const tags = f.tags || [];
         const createdBy = f.createdBy || 'Desconocido';
 
+        // Generar link de Google Maps
+        let mapsLink = '#';
+        if (f.locationData && f.locationData.placeId) {
+            mapsLink = `https://www.google.com/maps/place/?q=place_id:${f.locationData.placeId}`;
+        } else if (f.lat && f.lng) {
+            mapsLink = `https://www.google.com/maps?q=${f.lat},${f.lng}`;
+        }
+
         return `
         <div class="finding-card" onclick="showDetailModal('${f.id}')" style="cursor: pointer;">
             <button class="delete-btn" onclick="event.stopPropagation(); deleteFinding('${f.id}')">×</button>
@@ -959,7 +995,7 @@ function renderFindings() {
                 <h3>${f.title}</h3>
                 ${f.price ? `<div class="price">${f.price}</div>` : ''}
                 <p>${f.description ? f.description.substring(0, 100) + (f.description.length > 100 ? '...' : '') : 'Sin descripción'}</p>
-                ${f.location ? `<div class="location">📍 ${f.location}</div>` : ''}
+                ${f.location ? `<div class="location" onclick="event.stopPropagation(); window.open('${mapsLink}', '_blank')">📍 ${f.location}</div>` : ''}
                 ${tags.length ? `<div class="tags">${tags.slice(0, 3).map(t => `<span class="tag-item">${t}</span>`).join('')}${tags.length > 3 ? '<span class="tag-item">+' + (tags.length - 3) + '</span>' : ''}</div>` : ''}
                 <div class="date">${date}</div>
                 <div class="created-by">👤 ${createdBy}</div>
@@ -1016,7 +1052,25 @@ function renderDetailContent(finding) {
     // Ubicación
     const locationEl = document.getElementById('detail-location');
     if (finding.location) {
-        locationEl.innerHTML = `📍 ${finding.location}`;
+        // Generar link de Google Maps
+        let mapsUrl = '#';
+        let linkTarget = '';
+        if (finding.locationData && finding.locationData.placeId) {
+            mapsUrl = `https://www.google.com/maps/place/?q=place_id:${finding.locationData.placeId}`;
+            linkTarget = 'target="_blank"';
+        } else if (finding.lat && finding.lng) {
+            mapsUrl = `https://www.google.com/maps?q=${finding.lat},${finding.lng}`;
+            linkTarget = 'target="_blank"';
+        }
+        
+        // Mostrar nombre del lugar y dirección si existe
+        let locationHtml = `📍 <a href="${mapsUrl}" ${linkTarget} style="color: #1a73e8; text-decoration: none;">${finding.location}</a>`;
+        
+        if (finding.locationData && finding.locationData.address) {
+            locationHtml += `<div style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">${finding.locationData.address}</div>`;
+        }
+        
+        locationEl.innerHTML = locationHtml;
         locationEl.style.display = 'block';
     } else {
         locationEl.style.display = 'none';
@@ -1153,6 +1207,186 @@ async function saveFindingsToServer(findings) {
     console.log('Findings actualizados:', findings);
 }
 
+// Variables globales para el mapa de findings
+let findingsMap = null;
+let findingsMarkers = [];
+let currentView = 'list'; // 'list' o 'map'
+
+// Cambiar a vista de lista
+function switchToListView() {
+    currentView = 'list';
+    
+    // Actualizar botones
+    document.getElementById('btn-list-view').classList.add('active');
+    document.getElementById('btn-map-view').classList.remove('active');
+    
+    // Mostrar grid, ocultar mapa
+    document.getElementById('findings-grid').style.display = 'grid';
+    document.getElementById('findings-map').style.display = 'none';
+}
+
+// Cambiar a vista de mapa
+function switchToMapView() {
+    currentView = 'map';
+    
+    // Actualizar botones
+    document.getElementById('btn-list-view').classList.remove('active');
+    document.getElementById('btn-map-view').classList.add('active');
+    
+    // Ocultar grid, mostrar mapa
+    document.getElementById('findings-grid').style.display = 'none';
+    document.getElementById('findings-map').style.display = 'block';
+    
+    // Renderizar el mapa
+    setTimeout(() => {
+        renderFindingsMap();
+    }, 100);
+}
+
+// Renderizar mapa con pins de findings
+function renderFindingsMap() {
+    const mapContainer = document.getElementById('findings-map');
+    
+    // Limpiar marcadores anteriores
+    findingsMarkers.forEach(m => {
+        if (m.setMap) m.setMap(null); // Google
+        else if (m.remove) m.remove(); // Leaflet
+    });
+    findingsMarkers = [];
+    
+    // Filtrar findings con coordenadas
+    const findingsWithCoords = currentFindings.filter(f => 
+        f.lat && f.lng && !isNaN(parseFloat(f.lat)) && !isNaN(parseFloat(f.lng))
+    );
+    
+    if (findingsWithCoords.length === 0) {
+        mapContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #666; text-align: center; padding: 2rem;"><p>No hay items con ubicación guardada.<br>Agregá ubicaciones usando "Usar mi ubicación actual" o escribiendo el nombre de la tienda.</p></div>';
+        return;
+    }
+    
+    // Decidir qué librería usar
+    if (window.google && window.google.maps) {
+        renderFindingsMapGoogle(findingsWithCoords);
+    } else if (window.L) {
+        renderFindingsMapLeaflet(findingsWithCoords);
+    }
+}
+
+function renderFindingsMapGoogle(findings) {
+    const mapContainer = document.getElementById('findings-map');
+    
+    // Crear mapa si no existe
+    if (!findingsMap || !findingsMap.setZoom) {
+        findingsMap = new google.maps.Map(mapContainer, {
+            center: { lat: 35.6762, lng: 139.6503 },
+            zoom: 12
+        });
+    } else {
+        // Si ya existe, invalidar tamaño por si acaso
+        google.maps.event.trigger(findingsMap, 'resize');
+    }
+    
+    const bounds = new google.maps.LatLngBounds();
+    
+    findings.forEach(finding => {
+        const lat = parseFloat(finding.lat);
+        const lng = parseFloat(finding.lng);
+        
+        if (isNaN(lat) || isNaN(lng)) return;
+        
+        const position = { lat, lng };
+        bounds.extend(position);
+        
+        // Crear marcador
+        const marker = new google.maps.Marker({
+            position: position,
+            map: findingsMap,
+            title: finding.title,
+            animation: google.maps.Animation.DROP
+        });
+        
+        // Contenido del popup
+        const photoUrl = finding.photoUrl || finding.photo;
+        const content = `
+            <div style="max-width: 200px;">
+                ${photoUrl ? `<img src="${photoUrl}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 4px; margin-bottom: 0.5rem;">` : ''}
+                <h4 style="margin: 0 0 0.25rem 0; font-size: 1rem;">${finding.title}</h4>
+                ${finding.price ? `<div style="color: #1a73e8; font-weight: bold; margin-bottom: 0.25rem;">${finding.price}</div>` : ''}
+                ${finding.location ? `<div style="font-size: 0.85rem; color: #666; margin-bottom: 0.25rem;">${finding.location}</div>` : ''}
+                <a href="#" onclick="showDetailModal('${finding.id}'); return false;" style="color: #1a73e8; font-size: 0.9rem;">Ver detalles</a>
+            </div>
+        `;
+        
+        const infowindow = new google.maps.InfoWindow({ content });
+        
+        marker.addListener('click', () => {
+            infowindow.open(findingsMap, marker);
+        });
+        
+        findingsMarkers.push(marker);
+    });
+    
+    // Ajustar vista para mostrar todos los marcadores
+    if (!bounds.isEmpty()) {
+        findingsMap.fitBounds(bounds);
+        
+        // Si solo hay un marker, hacer zoom más cercano
+        if (findings.length === 1) {
+            findingsMap.setZoom(15);
+        }
+    }
+}
+
+function renderFindingsMapLeaflet(findings) {
+    const mapContainer = document.getElementById('findings-map');
+    
+    // Crear mapa si no existe
+    if (!findingsMap || !findingsMap.remove) {
+        findingsMap = L.map(mapContainer).setView([35.6762, 139.6503], 12);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(findingsMap);
+    } else {
+        // Si ya existe, invalidar tamaño
+        findingsMap.invalidateSize();
+    }
+    
+    const bounds = L.latLngBounds();
+    
+    findings.forEach(finding => {
+        const lat = parseFloat(finding.lat);
+        const lng = parseFloat(finding.lng);
+        
+        if (isNaN(lat) || isNaN(lng)) return;
+        
+        bounds.extend([lat, lng]);
+        
+        // Crear marcador
+        const marker = L.marker([lat, lng]).addTo(findingsMap);
+        
+        // Contenido del popup
+        const photoUrl = finding.photoUrl || finding.photo;
+        const popupContent = `
+            <div style="max-width: 200px;">
+                ${photoUrl ? `<img src="${photoUrl}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 4px; margin-bottom: 0.5rem;">` : ''}
+                <h4 style="margin: 0 0 0.25rem 0; font-size: 1rem;">${finding.title}</h4>
+                ${finding.price ? `<div style="color: #1a73e8; font-weight: bold; margin-bottom: 0.25rem;">${finding.price}</div>` : ''}
+                ${finding.location ? `<div style="font-size: 0.85rem; color: #666; margin-bottom: 0.25rem;">${finding.location}</div>` : ''}
+                <a href="#" onclick="showDetailModal('${finding.id}'); return false;" style="color: #1a73e8; font-size: 0.9rem;">Ver detalles</a>
+            </div>
+        `;
+        
+        marker.bindPopup(popupContent);
+        findingsMarkers.push(marker);
+    });
+    
+    // Ajustar vista
+    if (bounds.isValid()) {
+        findingsMap.fitBounds(bounds, { padding: [50, 50] });
+    }
+}
+
 // Hacer funciones disponibles globalmente para onclick
 window.showTab = showTab;
 window.loadRepoKML = loadRepoKML;
@@ -1169,7 +1403,133 @@ window.showDetailModal = showDetailModal;
 window.closeDetailModal = closeDetailModal;
 window.renderDetailContent = renderDetailContent;
 window.loadBarcodeData = loadBarcodeData;
+window.switchToListView = switchToListView;
+window.switchToMapView = switchToMapView;
+
+// Configuración de Google Places Autocomplete
+const AUTOCOMPLETE_MIN_CHARS = 3;
+let placesAutocomplete = null;
+
+// Inicializar Google Places Autocomplete
+function initPlacesAutocomplete() {
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+        console.log('[PLACES] Google Places no disponible aún');
+        return;
+    }
+
+    const locationInput = document.getElementById('finding-location');
+    if (!locationInput) return;
+
+    // Configurar Autocomplete
+    placesAutocomplete = new google.maps.places.Autocomplete(locationInput, {
+        types: ['establishment', 'geocode'], // Tiendas y direcciones
+        componentRestrictions: { country: 'JP' }, // Solo Japón
+        fields: ['place_id', 'name', 'geometry', 'formatted_address']
+    });
+
+    // Listener cuando selecciona un lugar
+    placesAutocomplete.addListener('place_changed', () => {
+        const place = placesAutocomplete.getPlace();
+        
+        if (!place.place_id) {
+            console.log('[PLACES] Lugar sin place_id');
+            return;
+        }
+
+        // Guardar datos en campos hidden
+        document.getElementById('finding-place-id').value = place.place_id;
+        document.getElementById('finding-place-name').value = place.name || '';
+        document.getElementById('finding-place-address').value = place.formatted_address || '';
+        
+        if (place.geometry && place.geometry.location) {
+            document.getElementById('finding-lat').value = place.geometry.location.lat();
+            document.getElementById('finding-lng').value = place.geometry.location.lng();
+        }
+
+        console.log('[PLACES] Lugar seleccionado:', place.name);
+    });
+
+    // Limitar búsqueda a partir de 3 caracteres
+    locationInput.addEventListener('input', (e) => {
+        if (e.target.value.length < AUTOCOMPLETE_MIN_CHARS) {
+            // Ocultar sugerencias si hay menos de 3 caracteres
+            const pacContainer = document.querySelector('.pac-container');
+            if (pacContainer) {
+                pacContainer.style.display = 'none';
+            }
+        }
+    });
+
+    console.log('[PLACES] Autocomplete inicializado');
+}
+
+// Reverse Geocoding - convertir coordenadas a lugar
+async function reverseGeocode(lat, lng) {
+    if (!window.google || !window.google.maps) {
+        console.log('[PLACES] Google Maps no disponible');
+        return null;
+    }
+
+    const geocoder = new google.maps.Geocoder();
+    
+    try {
+        const response = await new Promise((resolve, reject) => {
+            geocoder.geocode(
+                { location: { lat: parseFloat(lat), lng: parseFloat(lng) } },
+                (results, status) => {
+                    if (status === 'OK') {
+                        resolve(results);
+                    } else {
+                        reject(status);
+                    }
+                }
+            );
+        });
+
+        if (response && response.length > 0) {
+            // Buscar el resultado más específico (establishment preferido)
+            let bestResult = response[0];
+            
+            for (const result of response) {
+                // Si encontramos un establishment (tienda/negocio), usar ese
+                if (result.types && result.types.includes('establishment')) {
+                    bestResult = result;
+                    break;
+                }
+            }
+
+            const place = {
+                place_id: bestResult.place_id,
+                name: bestResult.name || bestResult.formatted_address.split(',')[0],
+                formatted_address: bestResult.formatted_address,
+                lat: lat,
+                lng: lng
+            };
+
+            console.log('[PLACES] Reverse geocoding:', place.name);
+            return place;
+        }
+    } catch (error) {
+        console.error('[PLACES] Error en reverse geocoding:', error);
+    }
+    
+    return null;
+}
 
 function setupEventListeners() {
-    // Cualquier setup adicional
+    // Inicializar Places cuando esté disponible
+    if (window.google && window.google.maps && window.google.maps.places) {
+        initPlacesAutocomplete();
+    } else {
+        // Esperar a que cargue Google Maps
+        const checkInterval = setInterval(() => {
+            if (window.google && window.google.maps && window.google.maps.places) {
+                initPlacesAutocomplete();
+                clearInterval(checkInterval);
+            }
+        }, 500);
+        
+        // Timeout después de 10 segundos
+        setTimeout(() => clearInterval(checkInterval), 10000);
+    }
 }

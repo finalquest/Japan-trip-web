@@ -366,7 +366,7 @@ app.get('/api/findings', authenticateToken, async (req, res) => {
 // Crear un hallazgo
 app.post('/api/findings', authenticateToken, upload.single('photo'), async (req, res) => {
     try {
-        const { title, description, price, barcode, location, lat, lng, tags } = req.body;
+        const { title, description, price, barcode, location, placeId, placeName, placeAddress, lat, lng, tags } = req.body;
 
         const finding = {
             id: uuidv4(),
@@ -383,6 +383,17 @@ app.post('/api/findings', authenticateToken, upload.single('photo'), async (req,
             userId: req.user.userId,
             createdAt: new Date().toISOString()
         };
+
+        // Agregar datos estructurados de ubicación si existen
+        if (placeId || placeName) {
+            finding.locationData = {
+                placeId: placeId || null,
+                name: placeName || null,
+                address: placeAddress || null,
+                lat: lat ? parseFloat(lat) : null,
+                lng: lng ? parseFloat(lng) : null
+            };
+        }
         
         const findings = await readFindings();
         findings.unshift(finding);

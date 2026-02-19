@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="style.css">
     <!-- Leaflet CSS (OpenStreetMap) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <!-- ZXing for barcode scanning -->
     <script src="/zxing-browser.min.js"></script>
@@ -79,24 +81,15 @@
             <div class="add-finding">
                 <h2>📸 Encontré algo interesante</h2>
                 
-                <!-- Paso 1: Elegir entre foto o barcode -->
-                <div id="camera-step" class="camera-only">
-                    <div class="capture-options">
-                        <button type="button" class="btn-camera-large" onclick="document.getElementById('finding-photo').click()">
-                            📸
-                        </button>
-                        <span class="option-label">Foto</span>
-                    </div>
-                    
-                    <div class="capture-options">
-                        <button type="button" class="btn-barcode-large" onclick="startBarcodeScan()">
-                            📊
-                        </button>
-                        <span class="option-label">Código de barras</span>
-                    </div>
-                    
+                <!-- Paso 1: Toolbar compacto -->
+                <div id="camera-step" class="camera-toolbar">
+                    <button type="button" class="btn-toolbar" onclick="document.getElementById('finding-photo').click()">
+                        📸 Foto
+                    </button>
+                    <button type="button" class="btn-toolbar" onclick="startBarcodeScan()">
+                        📊 Barcode
+                    </button>
                     <input type="file" id="finding-photo" accept="image/*" capture="environment" required style="display: none;">
-                    <p class="camera-hint">Elegí cómo capturar el producto</p>
                 </div>
                 
                 <!-- Paso 1b: Escanear barcode -->
@@ -142,8 +135,12 @@
 
                     <div class="form-group">
                         <label>Tienda / Ubicación:</label>
-                        <input type="text" id="finding-location" placeholder="Ej: Surugaya Akihabara">
+                        <input type="text" id="finding-location" placeholder="Ej: Surugaya Akihabara" autocomplete="off">
                         <button type="button" onclick="getCurrentLocation()">📍 Usar mi ubicación actual</button>
+                        <!-- Campos hidden para datos de ubicación -->
+                        <input type="hidden" id="finding-place-id">
+                        <input type="hidden" id="finding-place-name">
+                        <input type="hidden" id="finding-place-address">
                         <input type="hidden" id="finding-lat">
                         <input type="hidden" id="finding-lng">
                     </div>
@@ -167,8 +164,19 @@
             </div>
             
             <div class="findings-list">
-                <h2>Mis descubrimientos (<span id="findings-count">0</span>)</h2>
+                <div class="findings-header">
+                    <h2>Mis descubrimientos (<span id="findings-count">0</span>)</h2>
+                    <div class="view-toggle">
+                        <button type="button" id="btn-list-view" class="btn-view active" onclick="switchToListView()">
+                            📋 Lista
+                        </button>
+                        <button type="button" id="btn-map-view" class="btn-view" onclick="switchToMapView()">
+                            🗺️ Mapa
+                        </button>
+                    </div>
+                </div>
                 <div id="findings-grid"></div>
+                <div id="findings-map" style="display: none; height: 600px; border-radius: 12px; overflow: hidden;"></div>
             </div>
         </section>
     </main>

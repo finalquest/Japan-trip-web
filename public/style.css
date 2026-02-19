@@ -132,62 +132,46 @@ main {
     background: #555;
 }
 
-/* Botón de cámara (pantalla inicial) */
-.camera-only {
-    text-align: center;
-    padding: 1rem 0;
+/* Toolbar compacto (pantalla inicial) */
+.camera-toolbar {
     display: flex;
     justify-content: center;
-    gap: 2rem;
-    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border: 1px solid #e0e0e0;
 }
 
-.capture-options {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.option-label {
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.btn-camera-large, .btn-barcode-large {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
+.btn-toolbar {
+    padding: 0.5rem 1.5rem;
     border: none;
-    font-size: 2rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
     cursor: pointer;
     display: flex;
     align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    gap: 0.5rem;
     transition: all 0.2s;
 }
 
-.btn-camera-large {
+.btn-toolbar:first-child {
     background: #1a73e8;
     color: white;
 }
 
-.btn-camera-large:hover {
+.btn-toolbar:first-child:hover {
     background: #1557b0;
-    transform: scale(1.05);
-    box-shadow: 0 6px 20px rgba(26, 115, 232, 0.5);
 }
 
-.btn-barcode-large {
+.btn-toolbar:last-child {
     background: #34a853;
     color: white;
 }
 
-.btn-barcode-large:hover {
+.btn-toolbar:last-child:hover {
     background: #2d8a47;
-    transform: scale(1.05);
-    box-shadow: 0 6px 20px rgba(52, 168, 83, 0.5);
 }
 
 .btn-camera-large:active, .btn-barcode-large:active {
@@ -466,8 +450,42 @@ main {
 }
 
 /* Lista de hallazgos */
-.findings-list h2 {
+.findings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.findings-header h2 {
+    margin: 0;
+}
+
+.view-toggle {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-view {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.btn-view:hover {
+    background: #f5f5f5;
+}
+
+.btn-view.active {
+    background: #1a73e8;
+    color: white;
+    border-color: #1a73e8;
 }
 
 #findings-grid {
@@ -541,6 +559,12 @@ main {
 .finding-card .location {
     color: #1a73e8;
     font-size: 0.85rem;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.finding-card .location:hover {
+    color: #1557b0;
 }
 
 .finding-card .tags {
@@ -891,4 +915,45 @@ main {
 
 .btn-secondary:hover {
     background: #5a6268;
+}
+
+/* Mapa de findings */
+#findings-map {
+    width: 100%;
+    min-height: 600px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: #f5f5f5;
+}
+
+/* Estilos para popups de Google Maps */
+.gm-style .gm-style-iw-c {
+    border-radius: 8px !important;
+    padding: 12px !important;
+}
+
+.gm-style .gm-style-iw-d {
+    overflow: auto !important;
+}
+
+/* Estilos para popups de Leaflet */
+.leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    padding: 0;
+}
+
+.leaflet-popup-content {
+    margin: 12px;
+    min-width: 200px;
+}
+
+/* Animación de carga para el mapa */
+@keyframes mapLoading {
+    0% { opacity: 0.5; }
+    50% { opacity: 1; }
+    100% { opacity: 0.5; }
+}
+
+#findings-map.loading {
+    animation: mapLoading 1.5s ease-in-out infinite;
 }
