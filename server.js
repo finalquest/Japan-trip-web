@@ -12,13 +12,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const OpenAI = require('openai');
 const { parseItinerary } = require('./lib/itinerary-parser');
+const { getDatabase, initDatabase, migrateFromJSON } = require('./lib/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HTTPS_PORT = process.env.HTTPS_PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const DATA_FILE = path.join(__dirname, 'data', 'findings.json');
-const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'admin123';
 const MOONSHOT_API_KEY = process.env.MOONSHOT_API_KEY;
@@ -68,42 +67,94 @@ async function ensureDataDir() {
     }
 }
 
-// Leer hallazgos
-async function readFindings() {
-    try {
-        const data = await fs.readFile(DATA_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch {
-        return [];
-    }
+// Funciones de base de datos SQLite
+function readFindings() {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM findings ORDER BY created_at DESC');
+    const rows = stmt.all();
+    return rows.map(row => ({
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        price: row.price,
+        barcode: row.barcode,
+        location: row.location,
+        lat: row.lat,
+        lng: row.lng,
+        tags: JSON.parse(row.tags || '[]'),
+        photoUrl: row.photo_url,
+        createdBy: row.created_by,
+        userId: row.user_id,
+        createdAt: row.created_at,
+        locationData: JSON.parse(row.location_data || '{}')
+    }));
 }
 
-// Guardar hallazgos
-async function saveFindings(findings) {
-    await fs.writeFile(DATA_FILE, JSON.stringify(findings, null, 2));
+function readUsers() {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM users');
+    const rows = stmt.all();
+    return rows.map(row => ({
+        id: row.id,
+        username: row.username,
+        passwordHash: row.password_hash,
+        isAdmin: row.is_admin === 1,
+        createdAt: row.created_at
+    }));
 }
 
-// Leer usuarios
-async function readUsers() {
-    try {
-        const data = await fs.readFile(USERS_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch {
-        return [];
-    }
+function createFinding(finding) {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+        INSERT INTO findings (id, title, description, price, barcode, location, lat, lng, tags, photo_url, created_by, user_id, created_at, location_data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(
+        finding.id,
+        finding.title,
+        finding.description,
+        finding.price,
+        finding.barcode,
+        finding.location,
+        finding.lat,
+        finding.lng,
+        JSON.stringify(finding.tags || []),
+        finding.photoUrl,
+        finding.createdBy,
+        finding.userId,
+        finding.createdAt,
+        JSON.stringify(finding.locationData || {})
+    );
 }
 
-// Guardar usuarios
-async function saveUsers(users) {
-    await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
+function deleteFinding(id) {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM findings WHERE id = ?');
+    stmt.run(id);
+}
+
+function createUser(user) {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+        INSERT INTO users (id, username, password_hash, is_admin, created_at)
+        VALUES (?, ?, ?, ?, ?)
+    `);
+    stmt.run(user.id, user.username, user.passwordHash, user.isAdmin ? 1 : 0, user.createdAt);
+}
+
+function deleteUser(id) {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM users WHERE id = ?');
+    stmt.run(id);
 }
 
 // Crear usuario admin inicial
 async function createAdminUser() {
-    const users = await readUsers();
-    const adminExists = users.find(u => u.username === ADMIN_USER);
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT COUNT(*) as count FROM users WHERE username = ?');
+    const result = stmt.get(ADMIN_USER);
     
-    if (!adminExists) {
+    if (result.count === 0) {
         const hashedPassword = await bcrypt.hash(ADMIN_PASS, 10);
         const admin = {
             id: uuidv4(),
@@ -112,8 +163,7 @@ async function createAdminUser() {
             isAdmin: true,
             createdAt: new Date().toISOString()
         };
-        users.push(admin);
-        await saveUsers(users);
+        createUser(admin);
         console.log(`Admin user '${ADMIN_USER}' created successfully`);
     }
 }
@@ -148,7 +198,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
     
     try {
-        const users = await readUsers();
+        const users = readUsers();
         const user = users.find(u => u.username === username);
         
         if (!user) {
@@ -192,9 +242,9 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // ==================== USER ROUTES ====================
 
 // Listar usuarios
-app.get('/api/users', authenticateToken, async (req, res) => {
+app.get('/api/users', authenticateToken, (req, res) => {
     try {
-        const users = await readUsers();
+        const users = readUsers();
         const safeUsers = users.map(u => ({
             id: u.id,
             username: u.username,
@@ -211,18 +261,18 @@ app.get('/api/users', authenticateToken, async (req, res) => {
 // Crear usuario
 app.post('/api/users', authenticateToken, async (req, res) => {
     const { username, password } = req.body;
-    
+
     if (!username || !password) {
         return res.status(400).json({ error: 'Username and password required' });
     }
-    
+
     try {
-        const users = await readUsers();
-        
+        const users = readUsers();
+
         if (users.find(u => u.username === username)) {
             return res.status(400).json({ error: 'Username already exists' });
         }
-        
+
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = {
             id: uuidv4(),
@@ -231,10 +281,9 @@ app.post('/api/users', authenticateToken, async (req, res) => {
             isAdmin: false,
             createdAt: new Date().toISOString()
         };
-        
-        users.push(newUser);
-        await saveUsers(users);
-        
+
+        createUser(newUser);
+
         res.status(201).json({
             id: newUser.id,
             username: newUser.username,
@@ -248,24 +297,23 @@ app.post('/api/users', authenticateToken, async (req, res) => {
 });
 
 // Eliminar usuario
-app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+app.delete('/api/users/:id', authenticateToken, (req, res) => {
     const { id } = req.params;
-    
+
     try {
-        let users = await readUsers();
+        const users = readUsers();
         const user = users.find(u => u.id === id);
-        
+
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
         }
-        
+
         if (user.isAdmin) {
             return res.status(403).json({ error: 'Cannot delete admin user' });
         }
-        
-        users = users.filter(u => u.id !== id);
-        await saveUsers(users);
-        
+
+        deleteUser(id);
+
         res.json({ success: true });
     } catch (err) {
         console.error('Error deleting user:', err);
@@ -354,9 +402,9 @@ app.get('/api/lookup-barcode', authenticateToken, async (req, res) => {
 });
 
 // Obtener todos los hallazgos
-app.get('/api/findings', authenticateToken, async (req, res) => {
+app.get('/api/findings', authenticateToken, (req, res) => {
     try {
-        const findings = await readFindings();
+        const findings = readFindings();
         res.json(findings);
     } catch (err) {
         console.error('Error reading findings:', err.message);
@@ -396,9 +444,7 @@ app.post('/api/findings', authenticateToken, upload.single('photo'), async (req,
             };
         }
         
-        const findings = await readFindings();
-        findings.unshift(finding);
-        await saveFindings(findings);
+        createFinding(finding);
         
         res.status(201).json(finding);
     } catch (err) {
@@ -411,7 +457,7 @@ app.post('/api/findings', authenticateToken, upload.single('photo'), async (req,
 app.delete('/api/findings/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        let findings = await readFindings();
+        const findings = readFindings();
         
         const finding = findings.find(f => f.id === id);
         if (!finding) {
@@ -428,8 +474,7 @@ app.delete('/api/findings/:id', authenticateToken, async (req, res) => {
             }
         }
         
-        findings = findings.filter(f => f.id !== id);
-        await saveFindings(findings);
+        deleteFinding(id);
         
         res.json({ success: true });
     } catch (err) {
@@ -772,6 +817,12 @@ function encodeNumber(num) {
 // Iniciar servidor
 async function start() {
     await ensureDataDir();
+    
+    // Inicializar base de datos SQLite
+    initDatabase();
+    migrateFromJSON();
+    
+    // Crear usuario admin si no existe
     await createAdminUser();
     
     // Iniciar servidor HTTPS si hay certificados

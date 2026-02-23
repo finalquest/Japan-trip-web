@@ -1,17 +1,46 @@
 [
   {
-    "id": "590714e1-b952-4320-8dba-8036a9e809ed",
-    "title": "Takara Tomy Tomica Town Yoshinoya (with Tomica)",
+    "id": "29ae2ccd-8023-4469-a20c-93c6d81ab9bc",
+    "title": "CD/DVD reproductor",
     "description": "🏭 Marca: SONY\r\n🔢 Modelo: DVP-NS915V\r\n📋 Estado: usado\r\n🛡️ Garantía: 3 meses\r\n✨ Características:\r\n  • soporta Multichannel SACD",
     "price": "¥6,600",
-    "barcode": "4904810921141",
-    "location": "holis",
-    "lat": null,
-    "lng": null,
+    "barcode": null,
+    "location": "HARD OFF Akihabara 1st store, 3 Chome-11-2 Soto-Kanda, Chiyoda City, Tokyo, Japan",
+    "lat": 35.7005462,
+    "lng": 139.7705561,
     "tags": [],
-    "photoUrl": null,
+    "photoUrl": "/uploads/1771531997766-76f5a22d-62a4-47c9-bfba-4a3b085eeec0.webp",
     "createdBy": "admin",
     "userId": "c683fb48-6152-40ab-a32d-584cf3cb5d93",
-    "createdAt": "2026-02-19T18:56:06.738Z"
+    "createdAt": "2026-02-19T20:13:17.767Z",
+    "locationData": {
+      "placeId": "ChIJb8VKyh2MGGARawTAB3-P_mE",
+      "name": "HARD OFF Akihabara 1st store",
+      "address": "Japan, 〒101-0021 Tokyo, Chiyoda City, Sotokanda, 3-chōme−11−２ Rock Building, 2F/3F B1",
+      "lat": 35.7005462,
+      "lng": 139.7705561
+    }
+  },
+  {
+    "id": "893e4df1-6099-4d83-af18-017784909ea4",
+    "title": "CD/DVD reproductor",
+    "description": "🏭 Marca: SONY\r\n🔢 Modelo: DVP-NS915V\r\n📋 Estado: usado\r\n🛡️ Garantía: 3 meses\r\n✨ Características:\r\n  • soporta CD y DVD\r\n  • compatible con Multichannel SACD",
+    "price": "¥6,600",
+    "barcode": null,
+    "location": "Yodobashi Akiba, 1-1 Hanaokachō, Chiyoda City, Tokyo, Japan",
+    "lat": 35.698917,
+    "lng": 139.774798,
+    "tags": [],
+    "photoUrl": "/uploads/1771531282077-21bacfa8-2440-4c53-9118-e4717339efe7.webp",
+    "createdBy": "admin",
+    "userId": "c683fb48-6152-40ab-a32d-584cf3cb5d93",
+    "createdAt": "2026-02-19T20:01:22.080Z",
+    "locationData": {
+      "placeId": "ChIJGU_M2aeOGGARdnOLcMYXuXs",
+      "name": "Yodobashi Akiba",
+      "address": "1-1 Kanda Hanaokachō, Chiyoda City, Tokyo 101-0028, Japan",
+      "lat": 35.698917,
+      "lng": 139.774798
+    }
   }
 ]

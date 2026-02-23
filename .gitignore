@@ -34,3 +34,9 @@ debug-*.png
 
 # Uploads
 public/uploads/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+data/*.json
