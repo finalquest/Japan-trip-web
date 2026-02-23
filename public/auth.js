@@ -36,6 +36,11 @@ async function login(username, password) {
         showUserInfo();
         initApp();
         
+        // Inicializar visualizador de itinerarios
+        if (typeof initVizAfterLogin === 'function') {
+            initVizAfterLogin();
+        }
+        
         return true;
     } catch (err) {
         showLoginError(err.message);
@@ -63,6 +68,12 @@ async function checkAuth() {
         hideLoginModal();
         showUserInfo();
         initApp();
+        
+        // Inicializar visualizador de itinerarios
+        if (typeof initVizAfterLogin === 'function') {
+            initVizAfterLogin();
+        }
+        
         return true;
     } catch (err) {
         authToken = null;

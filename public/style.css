@@ -967,3 +967,342 @@ main {
 #findings-map.loading {
     animation: mapLoading 1.5s ease-in-out infinite;
 }
+
+/* ==================== VISUALIZADOR DE ITINERARIOS ==================== */
+
+#visualizador-section {
+    padding: 0;
+}
+
+#visualizador-container {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.viz-header {
+    padding: 1.5rem 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.viz-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.viz-selector {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.viz-selector label {
+    font-weight: 500;
+}
+
+.viz-selector select {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    min-width: 250px;
+    background: white;
+    color: #333;
+}
+
+.viz-empty {
+    padding: 4rem 2rem;
+    text-align: center;
+    color: #666;
+}
+
+.viz-empty p {
+    font-size: 1.2rem;
+}
+
+/* Navegación de días */
+.viz-days-nav {
+    background: #f8f9fa;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.days-list {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.day-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid #dee2e6;
+    background: white;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.day-btn:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.day-btn.active {
+    background: #1a73e8;
+    border-color: #1a73e8;
+    color: white;
+}
+
+.day-btn.buffer-day {
+    background: #fff3cd;
+    border-color: #ffc107;
+    color: #856404;
+}
+
+.day-btn.buffer-day.active {
+    background: #ffc107;
+    border-color: #ffc107;
+    color: #333;
+}
+
+/* Layout principal */
+.viz-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    min-height: 600px;
+}
+
+/* Mapa */
+.viz-map-container {
+    position: relative;
+    background: #f5f5f5;
+}
+
+.viz-map {
+    width: 100%;
+    height: 100%;
+    min-height: 600px;
+}
+
+.viz-map-controls {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    background: white;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 1000;
+}
+
+.toggle-route {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.toggle-route input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* Panel lateral */
+.viz-sidebar {
+    background: #f8f9fa;
+    border-left: 1px solid #e0e0e0;
+    padding: 1.5rem;
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+.day-info h3 {
+    margin: 0 0 0.75rem 0;
+    color: #333;
+    font-size: 1.3rem;
+}
+
+.day-purpose {
+    background: #e3f2fd;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    color: #1565c0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.viz-blocks, .viz-places {
+    margin-bottom: 1.5rem;
+}
+
+.viz-blocks h4, .viz-places h4 {
+    margin: 0 0 0.75rem 0;
+    color: #555;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.blocks-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.block-tag {
+    background: #6c757d;
+    color: white;
+    padding: 0.35rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-family: monospace;
+}
+
+.no-blocks, .no-places {
+    color: #999;
+    font-style: italic;
+    padding: 0.5rem 0;
+}
+
+.no-places-warning {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    padding: 1rem;
+    color: #856404;
+}
+
+.no-places-warning p {
+    margin: 0.5rem 0;
+}
+
+.no-places-warning ul {
+    margin: 0.5rem 0;
+}
+
+.places-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.place-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+
+.place-item:hover {
+    background: #e3f2fd;
+    border-color: #1a73e8;
+}
+
+.place-item.no-coords {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.place-item.no-coords:hover {
+    background: white;
+    border-color: transparent;
+}
+
+.place-number {
+    background: #1a73e8;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.place-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.place-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.place-name {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 0.25rem;
+}
+
+.place-address {
+    font-size: 0.85rem;
+    color: #666;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .viz-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .viz-sidebar {
+        border-left: none;
+        border-top: 1px solid #e0e0e0;
+        max-height: none;
+    }
+    
+    .viz-map {
+        min-height: 400px;
+    }
+}
+
+@media (max-width: 768px) {
+    .viz-header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .viz-selector {
+        width: 100%;
+        flex-direction: column;
+    }
+    
+    .viz-selector select {
+        min-width: 100%;
+    }
+    
+    .days-list {
+        padding-bottom: 0.5rem;
+    }
+    
+    .day-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.85rem;
+    }
+}

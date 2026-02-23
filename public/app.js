@@ -159,6 +159,7 @@ function showTab(tabName) {
     // Mapear nombres de tabs a IDs de secciones
     const sectionMap = {
         'map': 'map-section',
+        'visualizador': 'visualizador-section',
         'add-finding': 'add-finding-section',
         'findings-list': 'findings-list-section'
     };
@@ -188,6 +189,13 @@ function showTab(tabName) {
                     findingsMap.invalidateSize();
                 }
             }
+        }, 100);
+    }
+    
+    // Redimensionar mapa del visualizador cuando se cambia a esa pestaña
+    if (tabName === 'visualizador' && vizState.map) {
+        setTimeout(() => {
+            google.maps.event.trigger(vizState.map, 'resize');
         }, 100);
     }
 }

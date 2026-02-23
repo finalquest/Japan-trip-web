@@ -34,6 +34,7 @@
         <h1>🇯🇵 Japan Trip Planner</h1>
         <div class="nav-tabs">
             <button class="tab-btn active" onclick="showTab('map')">🗺️ Itinerario (KML)</button>
+            <button class="tab-btn" onclick="showTab('visualizador')">🗾 Visualizador</button>
             <button class="tab-btn" onclick="showTab('add-finding')">➕ Agregar</button>
             <button class="tab-btn" onclick="showTab('findings-list')">📋 Mis Hallazgos</button>
             <button class="tab-btn" onclick="showUsersModal()" id="users-btn" style="display: none;">⚙️ Usuarios</button>
@@ -75,6 +76,68 @@
             
             <div id="map-container" class="map-default"></div>
             <div id="route-info"></div>
+        </section>
+
+        <!-- Sección Visualizador de Itinerarios -->
+        <section id="visualizador-section" class="tab-content">
+            <div id="visualizador-container">
+                <!-- Header con selector de itinerario -->
+                <div class="viz-header">
+                    <h2>🗾 Visualizador de Itinerarios</h2>
+                    <div class="viz-selector">
+                        <label>Itinerario:</label>
+                        <select id="viz-itinerary-select">
+                            <option value="">-- Seleccionar itinerario --</option>
+                        </select>
+                        <button type="button" onclick="loadSelectedItinerary()" class="btn-secondary">Cargar</button>
+                    </div>
+                </div>
+                
+                <!-- Contenido del visualizador (oculto hasta seleccionar itinerario) -->
+                <div id="viz-content" style="display: none;">
+                    <!-- Navegación de días -->
+                    <div class="viz-days-nav">
+                        <div id="viz-days-list" class="days-list"></div>
+                    </div>
+                    
+                    <!-- Layout principal: Mapa + Panel lateral -->
+                    <div class="viz-layout">
+                        <!-- Mapa -->
+                        <div class="viz-map-container">
+                            <div id="viz-map" class="viz-map"></div>
+                            <div class="viz-map-controls">
+                                <label class="toggle-route">
+                                    <input type="checkbox" id="viz-show-route" onchange="toggleRoute()">
+                                    <span>Mostrar ruta</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Panel lateral -->
+                        <div class="viz-sidebar">
+                            <div id="viz-day-info" class="day-info">
+                                <h3 id="viz-day-title"></h3>
+                                <div id="viz-day-purpose" class="day-purpose"></div>
+                                
+                                <div class="viz-blocks">
+                                    <h4>Bloques:</h4>
+                                    <div id="viz-blocks-list" class="blocks-list"></div>
+                                </div>
+                                
+                                <div class="viz-places">
+                                    <h4>Lugares:</h4>
+                                    <div id="viz-places-list" class="places-list"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Mensaje inicial -->
+                <div id="viz-empty" class="viz-empty">
+                    <p>Selecciona un itinerario para comenzar a visualizar</p>
+                </div>
+            </div>
         </section>
 
         <!-- Sección Agregar Hallazgo -->
@@ -257,5 +320,6 @@
 
     <script src="auth.js"></script>
     <script src="app.js"></script>
+    <script src="app-visualizador.js"></script>
 </body>
 </html>

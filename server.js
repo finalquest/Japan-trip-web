@@ -11,6 +11,7 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const OpenAI = require('openai');
+const { parseItinerary } = require('./lib/itinerary-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -546,6 +547,228 @@ app.post('/api/extract-text', authenticateToken, uploadMemory.single('image'), a
     }
 });
 
+// ==================== ITINERARY VISUALIZER ROUTES ====================
+
+const GITHUB_REPO = 'finalquest/tokyo2026';
+
+// Listar todos los itinerarios disponibles desde GitHub
+app.get('/api/itineraries', authenticateToken, async (req, res) => {
+    try {
+        const response = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/contents/itinerarios`);
+        const itineraries = response.data
+            .filter(file => file.type === 'file' && file.name.endsWith('.md'))
+            .map(file => ({
+                id: file.name.replace(/\.md$/, '').replace(/^itinerario-2026-primavera-/, '').toLowerCase(),
+                name: file.name.replace(/\.md$/, '').replace(/^itinerario-2026-primavera-/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                file: file.name
+            }));
+        res.json({ itineraries });
+    } catch (err) {
+        console.error('Error loading itineraries from GitHub:', err.message);
+        res.status(500).json({ error: 'Failed to load itineraries' });
+    }
+});
+
+// Obtener un itinerario específico con sus días desde GitHub
+app.get('/api/itinerary/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Listar archivos para encontrar el correcto
+        const listResponse = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/contents/itinerarios`);
+        const file = listResponse.data.find(f => f.name.endsWith('.md') && 
+            f.name.replace(/\.md$/, '').replace(/^itinerario-2026-primavera-/, '').toLowerCase() === id);
+        
+        if (!file) {
+            return res.status(404).json({ error: 'Itinerary not found' });
+        }
+        
+        // Descargar contenido del archivo
+        const contentResponse = await axios.get(file.download_url);
+        const parsed = parseItinerary(contentResponse.data);
+        
+        res.json({
+            id: id,
+            name: file.name.replace(/\.md$/, '').replace(/^itinerario-2026-primavera-/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            base: parsed.base,
+            dates: parsed.dates,
+            days: parsed.days,
+            bufferDays: parsed.bufferDays
+        });
+    } catch (err) {
+        console.error('Error loading itinerary from GitHub:', err.message);
+        res.status(500).json({ error: 'Failed to load itinerary' });
+    }
+});
+
+// Obtener datos de un bloque específico (lugares y rutas) desde GitHub KML
+app.get('/api/block/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    
+    try {
+        // Generar variaciones del nombre del bloque para buscar el KML
+        const variations = [id];
+        const parts = id.split('-');
+        if (parts.length >= 2) {
+            const baseNumber = parts[0];
+            const nameParts = parts.slice(1);
+            
+            // Variaciones comunes
+            variations.push(`${baseNumber}-${nameParts.join('')}`);
+            
+            for (let i = 1; i < nameParts.length; i++) {
+                const before = nameParts.slice(0, i).join('-');
+                const after = nameParts.slice(i).join('-');
+                
+                for (let j = 4; j < after.length - 2; j++) {
+                    const variant = `${baseNumber}-${before}-${after.substring(0, j)}-${after.substring(j)}`;
+                    variations.push(variant);
+                }
+            }
+            
+            for (let i = 5; i < nameParts.join('-').length - 3; i++) {
+                const fullName = nameParts.join('-');
+                const variant = `${baseNumber}-${fullName.substring(0, i)}-${fullName.substring(i)}`;
+                variations.push(variant);
+            }
+        }
+        
+        // Buscar y parsear KML
+        let kmlData = null;
+        let foundVariant = null;
+        
+        for (const variant of [...new Set(variations)]) {
+            try {
+                const kmlUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/master/maps/${variant}.kml`;
+                const kmlResponse = await axios.get(kmlUrl, { timeout: 5000 });
+                kmlData = kmlResponse.data;
+                foundVariant = variant;
+                break;
+            } catch (err) {
+                // Continuar con siguiente variación
+            }
+        }
+        
+        if (!kmlData) {
+            return res.json({
+                blockId: id,
+                places: [],
+                routes: []
+            });
+        }
+        
+        // Parsear KML para extraer places y routes
+        const $ = cheerio.load(kmlData, { xmlMode: true });
+        const places = [];
+        const routes = [];
+        
+        // Extraer Placemarks
+        $('Placemark').each((i, elem) => {
+            // Buscar nombre en ExtendedData primero, luego en tag name
+            const name = $(elem).find('Data[name="name"] value').text() || 
+                        $(elem).find('name').text() || 
+                        `Lugar ${i + 1}`;
+            
+            // Buscar dirección en ExtendedData
+            const address = $(elem).find('Data[name="address"] value').text() || 
+                           $(elem).find('description').text() || 
+                           '';
+            
+            // VERIFICAR SI ES UN PUNTO (Lugar) - Buscar específicamente Point > coordinates
+            const pointCoords = $(elem).find('Point').find('coordinates').text();
+            
+            if (pointCoords) {
+                const coords = pointCoords.trim().split(',');
+                if (coords.length >= 2) {
+                    const lng = parseFloat(coords[0]);
+                    const lat = parseFloat(coords[1]);
+                    
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        // Extraer número de etiqueta del nombre (ej: "1. Itabashi Station" -> 1)
+                        const orderMatch = name.match(/^(\d+)\.\s*/);
+                        const labelNumber = orderMatch ? parseInt(orderMatch[1]) : (i + 1);
+                        
+                        places.push({
+                            name: name,
+                            address: address,
+                            lat: lat,
+                            lng: lng,
+                            order: places.length + 1,  // El orden de visita es el orden en el KML
+                            labelNumber: labelNumber  // El número que se muestra en el marcador
+                        });
+                    }
+                }
+            }
+            
+            // VERIFICAR SI ES UNA RUTA (LineString)
+            const lineStringCoords = $(elem).find('LineString').find('coordinates').text();
+            if (lineStringCoords && !pointCoords) {
+                // Solo procesar como ruta si NO es también un punto
+                const coords = lineStringCoords.trim().split(' ');
+                
+                // Generar polyline simple para la ruta
+                const pathCoords = coords.map(coord => {
+                    const parts = coord.split(',');
+                    return {
+                        lat: parseFloat(parts[1]),
+                        lng: parseFloat(parts[0])
+                    };
+                }).filter(c => !isNaN(c.lat) && !isNaN(c.lng));
+                
+                if (pathCoords.length > 0) {
+                    routes.push({
+                        from: 'Inicio',
+                        to: name,
+                        polyline: encodePolyline(pathCoords)
+                    });
+                }
+            }
+        });
+        
+        res.json({
+            blockId: id,
+            places,
+            routes
+        });
+    } catch (err) {
+        console.error(`[BLOCK] Error loading KML for "${id}":`, err.message);
+        res.status(500).json({ error: 'Failed to load block data' });
+    }
+});
+
+// Función para codificar polyline (formato de Google)
+function encodePolyline(coords) {
+    let result = '';
+    let prevLat = 0;
+    let prevLng = 0;
+    
+    for (const coord of coords) {
+        const lat = Math.round(coord.lat * 1e5);
+        const lng = Math.round(coord.lng * 1e5);
+        
+        result += encodeNumber(lat - prevLat);
+        result += encodeNumber(lng - prevLng);
+        
+        prevLat = lat;
+        prevLng = lng;
+    }
+    
+    return result;
+}
+
+function encodeNumber(num) {
+    num = num < 0 ? ~(num << 1) : num << 1;
+    let result = '';
+    
+    while (num >= 0x20) {
+        result += String.fromCharCode((0x20 | (num & 0x1f)) + 63);
+        num >>= 5;
+    }
+    
+    result += String.fromCharCode(num + 63);
+    return result;
+}
+
 // Iniciar servidor
 async function start() {
     await ensureDataDir();
@@ -589,6 +812,9 @@ async function start() {
     console.log(`  POST /api/findings`);
     console.log(`  DELETE /api/findings/:id`);
     console.log(`  POST /api/extract-text`);
+    console.log(`  GET  /api/itineraries`);
+    console.log(`  GET  /api/itinerary/:id`);
+    console.log(`  GET  /api/block/:id`);
 }
 
 start();
