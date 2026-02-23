@@ -25,3 +25,12 @@ npm-debug.log*
 # Temporary files
 *.tmp
 *.temp
+
+# Test files
+test-results/
+*.spec.js
+test-*.png
+debug-*.png
+
+# Uploads
+public/uploads/
