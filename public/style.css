@@ -1120,6 +1120,28 @@ main {
     cursor: pointer;
 }
 
+.route-type-selector {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.route-type-selector label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.route-type-selector input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
 /* Panel lateral */
 .viz-sidebar {
     background: #f8f9fa;

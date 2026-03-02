@@ -14,7 +14,8 @@ const vizState = {
     polylines: [],
     map: null,
     infoWindow: null,
-    showRoute: false
+    showRoute: false,
+    routeType: 'point-to-point'
 };
 
 // Inicializar cuando el DOM esté listo (solo inicializar el mapa, no cargar datos)
@@ -165,6 +166,125 @@ async function selectDay(dayNumber) {
 }
 
 /**
+ * Limpia el nombre de un lugar eliminando el prefijo numérico
+ */
+function cleanPlaceName(name) {
+    if (!name) return '';
+    return name.replace(/^\d+\.\s*/, '');
+}
+
+/**
+ * Calcula la distancia euclidiana entre dos lugares
+ */
+function getDistance(place1, place2) {
+    if (!place1.lat || !place1.lng || !place2.lat || !place2.lng) return Infinity;
+    return Math.sqrt(
+        Math.pow(place1.lat - place2.lat, 2) + 
+        Math.pow(place1.lng - place2.lng, 2)
+    );
+}
+
+/**
+ * Ordena lugares usando algoritmo Nearest Neighbor
+ */
+function sortPlacesByProximity(places, isCircular = false) {
+    if (places.length < 2) return places;
+    
+    const unvisited = [...places];
+    const sorted = [];
+    
+    let current = unvisited.shift();
+    sorted.push(current);
+    
+    while (unvisited.length > 0) {
+        let nearestIndex = 0;
+        let minDistance = Infinity;
+        
+        for (let i = 0; i < unvisited.length; i++) {
+            const dist = getDistance(current, unvisited[i]);
+            if (dist < minDistance) {
+                minDistance = dist;
+                nearestIndex = i;
+            }
+        }
+        
+        current = unvisited.splice(nearestIndex, 1)[0];
+        sorted.push(current);
+    }
+    
+    if (isCircular) {
+        sorted.push(places[0]);
+    }
+    
+    return sorted;
+}
+
+/**
+ * Genera rutas secuenciales desde lugares ordenados
+ */
+function generateRoutesFromPlaces(places) {
+    const routes = [];
+    
+    for (let i = 0; i < places.length - 1; i++) {
+        const from = places[i];
+        const to = places[i + 1];
+        
+        if (from.lat && from.lng && to.lat && to.lng) {
+            const path = [
+                { lat: from.lat, lng: from.lng },
+                { lat: to.lat, lng: to.lng }
+            ];
+            
+            routes.push({
+                from: from.name,
+                to: to.name,
+                polyline: encodePolyline(path)
+            });
+        }
+    }
+    
+    return routes;
+}
+
+/**
+ * Codifica una ruta a polyline (formato de Google)
+ */
+function encodePolyline(coords) {
+    let result = '';
+    let prevLat = 0;
+    let prevLng = 0;
+    
+    for (const coord of coords) {
+        const lat = Math.round(coord.lat * 1e5);
+        const lng = Math.round(coord.lng * 1e5);
+        
+        result += encodeNumber(lat - prevLat);
+        result += encodeNumber(lng - prevLng);
+        
+        prevLat = lat;
+        prevLng = lng;
+    }
+    
+    return result;
+}
+
+/**
+ * Codifica un número para polyline
+ */
+function encodeNumber(num) {
+    num = num < 0 ? ~(num << 1) : num << 1;
+    let result = '';
+    
+    while (num >= 0x20) {
+        result += String.fromCharCode((0x20 | (num & 0x1f)) + 63);
+        num >>= 5;
+    }
+    
+    result += String.fromCharCode(num + 63);
+    return result;
+}
+
+/**
  * Renderiza la lista de bloques
  */
 function renderBlocks(blocks) {
@@ -207,23 +327,38 @@ async function loadDayPlaces(day) {
             
             const data = await response.json();
             
-            // Agregar lugares (evitando duplicados por nombre)
+            // Agregar lugares (evitando duplicados por nombre y ubicación)
             data.places.forEach(place => {
-                const exists = vizState.places.find(p => p.name === place.name);
-                if (!exists) {
+                const existsByName = vizState.places.find(p => p.name === place.name);
+                const existsByLocation = vizState.places.find(p => {
+                    if (!p.lat || !p.lng || !place.lat || !place.lng) return false;
+                    const distance = Math.sqrt(
+                        Math.pow(p.lat - place.lat, 2) + Math.pow(p.lng - place.lng, 2)
+                    );
+                    return distance < 0.0001;
+                });
+                
+                if (!existsByName && !existsByLocation) {
                     vizState.places.push(place);
                 }
             });
-            
-            // Agregar rutas
-            if (data.routes) {
-                vizState.routes.push(...data.routes);
-            }
             
         } catch (err) {
             console.error(`Error loading block ${blockId}:`, err);
         }
     }
+    
+    // Ordenar lugares por proximidad (Nearest Neighbor)
+    const isCircular = vizState.routeType === 'circular';
+    vizState.places = sortPlacesByProximity(vizState.places, isCircular);
+    
+    // Generar rutas secuenciales desde el ordenamiento
+    vizState.routes = generateRoutesFromPlaces(vizState.places);
+    
+    // Reenumerar lugares para que sean secuenciales
+    vizState.places.forEach((place, index) => {
+        place.labelNumber = index + 1;
+    });
 }
 
 /**
@@ -262,7 +397,7 @@ function renderPlaces() {
                 <span class="place-number">${labelNumber}</span>
                 <span class="place-icon">📍</span>
                 <div class="place-info">
-                    <div class="place-name">${place.name}</div>
+                    <div class="place-name">${cleanPlaceName(place.name)}</div>
                     ${place.address ? `<div class="place-address">${place.address}</div>` : ''}
                 </div>
             </div>
@@ -331,7 +466,7 @@ function updateMap() {
             const marker = new google.maps.Marker({
                 position: { lat: place.lat, lng: place.lng },
                 map: vizState.map,
-                title: `${labelNumber}. ${place.name}`,
+                title: `${labelNumber}. ${cleanPlaceName(place.name)}`,
                 label: {
                     text: String(labelNumber),
                     color: 'white'
@@ -342,7 +477,7 @@ function updateMap() {
             marker.addListener('click', () => {
                 vizState.infoWindow.setContent(`
                     <div style="min-width: 200px;">
-                        <b>${labelNumber}. ${place.name}</b><br>
+                        <b>${labelNumber}. ${cleanPlaceName(place.name)}</b><br>
                         ${place.address || ''}
                     </div>
                 `);
@@ -461,10 +596,29 @@ function toggleRoute() {
     updateMap();
 }
 
+/**
+ * Cambia el tipo de ruta y recarga el día actual
+ */
+function changeRouteType() {
+    const radioButtons = document.getElementsByName('route-type');
+    for (const radio of radioButtons) {
+        if (radio.checked) {
+            vizState.routeType = radio.value;
+            break;
+        }
+    }
+    
+    // Recargar el día actual con el nuevo tipo de ruta
+    if (vizState.currentDay) {
+        selectDay(vizState.currentDay);
+    }
+}
+
 // Exponer funciones globales necesarias
 window.loadSelectedItinerary = loadSelectedItinerary;
 window.selectDay = selectDay;
 window.toggleRoute = toggleRoute;
+window.changeRouteType = changeRouteType;
 window.focusOnPlace = focusOnPlace;
 window.initVizAfterLogin = initVizAfterLogin;
 window.vizState = vizState;

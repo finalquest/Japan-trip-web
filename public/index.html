@@ -110,6 +110,16 @@
                                     <input type="checkbox" id="viz-show-route" onchange="toggleRoute()">
                                     <span>Mostrar ruta</span>
                                 </label>
+                                <div class="route-type-selector">
+                                    <label>
+                                        <input type="radio" name="route-type" value="point-to-point" checked onchange="changeRouteType()">
+                                        <span>↔️ Punto a punto</span>
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="route-type" value="circular" onchange="changeRouteType()">
+                                        <span>🔄 Circular</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
                         
