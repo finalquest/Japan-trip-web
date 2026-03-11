@@ -1142,7 +1142,7 @@ main {
     cursor: pointer;
 }
 
-.viz-refresh-status {
+.repo-refresh-status {
     display: inline-flex;
     align-items: center;
     min-height: 36px;
@@ -1150,7 +1150,7 @@ main {
     font-size: 0.9rem;
 }
 
-.viz-refresh-status.error {
+.repo-refresh-status.error {
     color: #c62828;
 }
 

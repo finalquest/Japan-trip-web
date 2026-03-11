@@ -9,6 +9,8 @@ const REPO_OWNER = 'finalquest';
 const REPO_NAME = 'tokyo2026';
 const REPO_BRANCH = 'master';
 const KML_FOLDER = 'maps';
+let repoRefreshToken = null;
+let repoRefreshing = false;
 
 // Inicializar app (llamado desde auth.js después de autenticación)
 function initApp() {
@@ -21,13 +23,32 @@ function initApp() {
 // Exportar para usar desde auth.js
 window.initApp = initApp;
 
+function buildRepoRefreshUrl(basePath) {
+    const url = new URL(basePath, window.location.origin);
+
+    if (repoRefreshToken) {
+        url.searchParams.set('refresh', repoRefreshToken);
+    }
+
+    return url.toString();
+}
+
+function setRepoRefreshStatus(message, isError = false) {
+    const statusEl = document.getElementById('repo-refresh-status');
+    if (!statusEl) return;
+
+    statusEl.textContent = message || '';
+    statusEl.classList.toggle('error', Boolean(isError));
+}
+
 // Cargar lista de KMLs desde nuestro backend (que hace proxy a GitHub)
 async function loadKMLList() {
     const select = document.getElementById('repo-kml-select');
     
     try {
-        const response = await fetch(`${API_BASE}/api/kmls`, {
-            headers: getAuthHeaders()
+        const response = await fetch(buildRepoRefreshUrl(`${API_BASE}/api/kmls`), {
+            headers: getAuthHeaders(),
+            cache: 'no-store'
         });
         
         if (!response.ok) {
@@ -82,7 +103,7 @@ async function loadRepoKML() {
             currentInfoWindow = null;
         }
         
-        const response = await fetch(url);
+        const response = await fetch(buildRepoRefreshUrl(url), { cache: 'no-store' });
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -123,6 +144,44 @@ async function loadRepoKML() {
     } catch (error) {
         console.error('Error cargando KML:', error);
         alert(`❌ Error: ${error.message}`);
+    }
+}
+
+async function refreshRepoKMLContent() {
+    if (repoRefreshing) return;
+
+    repoRefreshing = true;
+    setRepoRefreshStatus('Actualizando...');
+
+    try {
+        const response = await fetch(`${API_BASE}/api/repo/refresh`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            cache: 'no-store'
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        repoRefreshToken = data.refreshToken;
+
+        const currentSelection = document.getElementById('repo-kml-select').value;
+        await loadKMLList();
+
+        if (currentSelection) {
+            document.getElementById('repo-kml-select').value = currentSelection;
+        }
+
+        setRepoRefreshStatus(`Actualizado ${new Date(data.refreshedAt).toLocaleTimeString()}`);
+        showNotification('🔄 Lista de itinerarios actualizada');
+    } catch (error) {
+        console.error('Error refreshing repo KML content:', error);
+        setRepoRefreshStatus('No se pudo refrescar', true);
+        alert('❌ No se pudo refrescar el contenido del repositorio');
+    } finally {
+        repoRefreshing = false;
     }
 }
 
@@ -1422,6 +1481,7 @@ function renderFindingsMapLeaflet(findings) {
 // Hacer funciones disponibles globalmente para onclick
 window.showTab = showTab;
 window.loadRepoKML = loadRepoKML;
+window.refreshRepoKMLContent = refreshRepoKMLContent;
 window.backToSelector = backToSelector;
 window.toggleTag = toggleTag;
 window.getCurrentLocation = getCurrentLocation;
