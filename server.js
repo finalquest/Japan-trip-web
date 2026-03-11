@@ -33,11 +33,41 @@ const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
 const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
 const ENABLE_HTTP = process.env.ENABLE_HTTP === 'true';
 const HAS_SSL = SSL_CERT_PATH && SSL_KEY_PATH;
+const GITHUB_REPO = 'finalquest/tokyo2026';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+function setNoStore(res) {
+    res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'Surrogate-Control': 'no-store'
+    });
+}
+
+function getGithubRequestConfig(req, extraConfig = {}) {
+    const refreshToken = req.query.refresh || req.query._ts || Date.now().toString();
+
+    return {
+        ...extraConfig,
+        headers: {
+            'Accept': 'application/vnd.github+json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'X-Refresh-Token': refreshToken,
+            ...(extraConfig.headers || {})
+        }
+    };
+}
+
+function appendRefreshToken(url, refreshToken) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}refresh=${encodeURIComponent(refreshToken)}`;
+}
 
 // Middleware de autenticación
 const authenticateToken = (req, res, next) => {
@@ -594,12 +624,14 @@ app.post('/api/extract-text', authenticateToken, uploadMemory.single('image'), a
 
 // ==================== ITINERARY VISUALIZER ROUTES ====================
 
-const GITHUB_REPO = 'finalquest/tokyo2026';
-
 // Listar todos los itinerarios disponibles desde GitHub
 app.get('/api/itineraries', authenticateToken, async (req, res) => {
     try {
-        const response = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/contents/itinerarios`);
+        setNoStore(res);
+        const response = await axios.get(
+            `https://api.github.com/repos/${GITHUB_REPO}/contents/itinerarios`,
+            getGithubRequestConfig(req)
+        );
         const itineraries = response.data
             .filter(file => file.type === 'file' && file.name.endsWith('.md'))
             .map(file => ({
@@ -617,10 +649,15 @@ app.get('/api/itineraries', authenticateToken, async (req, res) => {
 // Obtener un itinerario específico con sus días desde GitHub
 app.get('/api/itinerary/:id', authenticateToken, async (req, res) => {
     try {
+        setNoStore(res);
         const { id } = req.params;
+        const refreshToken = req.query.refresh || req.query._ts || Date.now().toString();
         
         // Listar archivos para encontrar el correcto
-        const listResponse = await axios.get(`https://api.github.com/repos/${GITHUB_REPO}/contents/itinerarios`);
+        const listResponse = await axios.get(
+            `https://api.github.com/repos/${GITHUB_REPO}/contents/itinerarios`,
+            getGithubRequestConfig(req)
+        );
         const file = listResponse.data.find(f => f.name.endsWith('.md') && 
             f.name.replace(/\.md$/, '').replace(/^itinerario-2026-primavera-/, '').toLowerCase() === id);
         
@@ -629,7 +666,10 @@ app.get('/api/itinerary/:id', authenticateToken, async (req, res) => {
         }
         
         // Descargar contenido del archivo
-        const contentResponse = await axios.get(file.download_url);
+        const contentResponse = await axios.get(
+            appendRefreshToken(file.download_url, refreshToken),
+            getGithubRequestConfig(req)
+        );
         const parsed = parseItinerary(contentResponse.data);
         
         res.json({
@@ -651,6 +691,8 @@ app.get('/api/block/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     
     try {
+        setNoStore(res);
+        const refreshToken = req.query.refresh || req.query._ts || Date.now().toString();
         // Generar variaciones del nombre del bloque para buscar el KML
         const variations = [id];
         const parts = id.split('-');
@@ -684,8 +726,14 @@ app.get('/api/block/:id', authenticateToken, async (req, res) => {
         
         for (const variant of [...new Set(variations)]) {
             try {
-                const kmlUrl = `https://raw.githubusercontent.com/${GITHUB_REPO}/master/maps/${variant}.kml`;
-                const kmlResponse = await axios.get(kmlUrl, { timeout: 5000 });
+                const kmlUrl = appendRefreshToken(
+                    `https://raw.githubusercontent.com/${GITHUB_REPO}/master/maps/${variant}.kml`,
+                    refreshToken
+                );
+                const kmlResponse = await axios.get(
+                    kmlUrl,
+                    getGithubRequestConfig(req, { timeout: 5000 })
+                );
                 kmlData = kmlResponse.data;
                 foundVariant = variant;
                 break;
@@ -772,6 +820,7 @@ app.get('/api/block/:id', authenticateToken, async (req, res) => {
         
         res.json({
             blockId: id,
+            resolvedBlockId: foundVariant || id,
             places,
             routes
         });
@@ -779,6 +828,15 @@ app.get('/api/block/:id', authenticateToken, async (req, res) => {
         console.error(`[BLOCK] Error loading KML for "${id}":`, err.message);
         res.status(500).json({ error: 'Failed to load block data' });
     }
+});
+
+app.post('/api/repo/refresh', authenticateToken, (req, res) => {
+    setNoStore(res);
+    res.json({
+        refreshToken: Date.now().toString(),
+        refreshedAt: new Date().toISOString(),
+        repo: GITHUB_REPO
+    });
 });
 
 // Función para codificar polyline (formato de Google)
@@ -866,6 +924,7 @@ async function start() {
     console.log(`  GET  /api/itineraries`);
     console.log(`  GET  /api/itinerary/:id`);
     console.log(`  GET  /api/block/:id`);
+    console.log(`  POST /api/repo/refresh`);
 }
 
 start();

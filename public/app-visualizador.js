@@ -15,7 +15,9 @@ const vizState = {
     map: null,
     infoWindow: null,
     showRoute: false,
-    routeType: 'point-to-point'
+    routeType: 'point-to-point',
+    refreshToken: null,
+    isRefreshing: false
 };
 
 // Inicializar cuando el DOM esté listo (solo inicializar el mapa, no cargar datos)
@@ -28,18 +30,39 @@ function initVizAfterLogin() {
     loadItinerariesList();
 }
 
+function buildRefreshUrl(basePath) {
+    const url = new URL(basePath, window.location.origin);
+
+    if (vizState.refreshToken) {
+        url.searchParams.set('refresh', vizState.refreshToken);
+    }
+
+    return url.toString();
+}
+
+function getAuthFetchOptions() {
+    return {
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        cache: 'no-store'
+    };
+}
+
+function setRefreshStatus(message, isError = false) {
+    const statusEl = document.getElementById('viz-refresh-status');
+    if (!statusEl) return;
+
+    statusEl.textContent = message || '';
+    statusEl.classList.toggle('error', Boolean(isError));
+}
+
 /**
  * Carga la lista de itinerarios disponibles
  */
 async function loadItinerariesList() {
     try {
-        const token = localStorage.getItem('authToken');
-        
-        const response = await fetch('/api/itineraries', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        const response = await fetch(buildRefreshUrl('/api/itineraries'), getAuthFetchOptions());
         
         if (!response.ok) throw new Error('Failed to load itineraries');
         
@@ -72,11 +95,10 @@ async function loadSelectedItinerary() {
     }
     
     try {
-        const response = await fetch(`/api/itinerary/${itineraryId}`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-            }
-        });
+        const response = await fetch(
+            buildRefreshUrl(`/api/itinerary/${itineraryId}`),
+            getAuthFetchOptions()
+        );
         
         if (!response.ok) throw new Error('Failed to load itinerary');
         
@@ -314,11 +336,10 @@ async function loadDayPlaces(day) {
         loadedBlocks.add(blockId);
         
         try {
-            const response = await fetch(`/api/block/${blockId}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                }
-            });
+            const response = await fetch(
+                buildRefreshUrl(`/api/block/${blockId}`),
+                getAuthFetchOptions()
+            );
             
             if (!response.ok) {
                 console.warn(`Block ${blockId} not found`);
@@ -359,6 +380,46 @@ async function loadDayPlaces(day) {
     vizState.places.forEach((place, index) => {
         place.labelNumber = index + 1;
     });
+}
+
+async function refreshGitContent() {
+    if (vizState.isRefreshing) return;
+
+    vizState.isRefreshing = true;
+    setRefreshStatus('Actualizando...');
+
+    try {
+        const response = await fetch('/api/repo/refresh', {
+            method: 'POST',
+            ...getAuthFetchOptions()
+        });
+
+        if (!response.ok) throw new Error('Failed to refresh repo content');
+
+        const data = await response.json();
+        vizState.refreshToken = data.refreshToken;
+
+        await loadItinerariesList();
+
+        if (vizState.currentItinerary?.id) {
+            const previousDay = vizState.currentDay;
+            const select = document.getElementById('viz-itinerary-select');
+            select.value = vizState.currentItinerary.id;
+            await loadSelectedItinerary();
+
+            if (previousDay != null) {
+                await selectDay(previousDay);
+            }
+        }
+
+        setRefreshStatus(`Actualizado ${new Date(data.refreshedAt).toLocaleTimeString()}`);
+    } catch (err) {
+        console.error('Error refreshing Git content:', err);
+        setRefreshStatus('No se pudo refrescar', true);
+        alert('Error al refrescar el contenido desde Git');
+    } finally {
+        vizState.isRefreshing = false;
+    }
 }
 
 /**
@@ -621,4 +682,5 @@ window.toggleRoute = toggleRoute;
 window.changeRouteType = changeRouteType;
 window.focusOnPlace = focusOnPlace;
 window.initVizAfterLogin = initVizAfterLogin;
+window.refreshGitContent = refreshGitContent;
 window.vizState = vizState;

@@ -1142,6 +1142,18 @@ main {
     cursor: pointer;
 }
 
+.viz-refresh-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    color: #2e7d32;
+    font-size: 0.9rem;
+}
+
+.viz-refresh-status.error {
+    color: #c62828;
+}
+
 /* Panel lateral */
 .viz-sidebar {
     background: #f8f9fa;
