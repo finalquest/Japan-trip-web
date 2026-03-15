@@ -69,6 +69,10 @@ function appendRefreshToken(url, refreshToken) {
     return `${url}${separator}refresh=${encodeURIComponent(refreshToken)}`;
 }
 
+function decodeGithubContent(encodedContent = '') {
+    return Buffer.from(encodedContent.replace(/\n/g, ''), 'base64').toString('utf8');
+}
+
 // Middleware de autenticación
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -665,12 +669,12 @@ app.get('/api/itinerary/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Itinerary not found' });
         }
         
-        // Descargar contenido del archivo
+        // Descargar contenido del archivo desde la API de GitHub para evitar caché agresivo en raw.githubusercontent
         const contentResponse = await axios.get(
-            appendRefreshToken(file.download_url, refreshToken),
+            `https://api.github.com/repos/${GITHUB_REPO}/contents/itinerarios/${encodeURIComponent(file.name)}?refresh=${encodeURIComponent(refreshToken)}`,
             getGithubRequestConfig(req)
         );
-        const parsed = parseItinerary(contentResponse.data);
+        const parsed = parseItinerary(decodeGithubContent(contentResponse.data.content));
         
         res.json({
             id: id,
